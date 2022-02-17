@@ -1,7 +1,7 @@
 import tensorflow as tf
 from typing import List, Tuple, Optional
-from models.reconstruction_losses import gaussian_loss
-from models.latentspace import LatentSpace
+from lsbd_vae.models.reconstruction_losses import gaussian_loss
+from lsbd_vae.models.latentspace import LatentSpace
 
 
 class BaseLSBDVAE(tf.keras.Model):
@@ -109,10 +109,6 @@ class BaseLSBDVAE(tf.keras.Model):
         encoder = tf.keras.models.Model(input_layer, [lst_loc, lst_scale, lst_sample])
         return encoder
 
-    def set_encoder_unlabeled(self) -> tf.keras.models:
-        single_input_layer = tf.keras.layers.Input((1, *self.input_shape_))
-        return self.set_encoder(single_input_layer)
-
     @tf.function
     def kl_loss_function(self, loc_parameter_estimates, scale_parameter_estimates):
         kl_losses = []
@@ -121,9 +117,9 @@ class BaseLSBDVAE(tf.keras.Model):
             kl_loss_ = latent_space.kl_loss(
                 [loc_parameter_estimates[num_latent_space], scale_parameter_estimates[num_latent_space]])
             kl_losses.append(kl_loss_)
-        kl_loss = tf.add_n(kl_losses) # shape (batch, n_transformations)
-        kl_loss = tf.reduce_sum(kl_loss, axis=-1) # shape (batch)
-        kl_loss = tf.reduce_mean(kl_loss) # shape ()
+        kl_loss = tf.add_n(kl_losses)  # shape (batch, n_transformations)
+        kl_loss = tf.reduce_sum(kl_loss, axis=-1)  # shape (batch)
+        kl_loss = tf.reduce_mean(kl_loss)  # shape ()
         return kl_loss
 
     @property
@@ -184,10 +180,10 @@ class UnsupervisedLSBDVAE(BaseLSBDVAE):
                                                   latent_spaces, input_shape,
                                                   reconstruction_loss, stop_gradient, **kwargs)
 
-        self.encoder_single_view = self.set_encoder_unlabeled()
+        self.encoder_single_view = self.set_encoder_single_view()
         self.decoder_unlabeled = self.set_decoder_unlabeled()
 
-    def set_encoder_unlabeled(self) -> tf.keras.models.Model:
+    def set_encoder_single_view(self) -> tf.keras.models.Model:
         mult_input_layer = tf.keras.layers.Input((1, *self.input_shape_))
         return self.set_encoder(mult_input_layer)
 
@@ -200,7 +196,8 @@ class UnsupervisedLSBDVAE(BaseLSBDVAE):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             # If one input is provided the training is unsupervised
-            image_input = data[0][0]
+            print(data)
+            image_input = data[0]["images"]
             # Estimate encoder parameters and sample
             loc_parameter_estimates, scale_parameter_estimates, samples = self.encoder_single_view(image_input)
             z = tf.keras.layers.Concatenate(-1)(samples)
@@ -239,11 +236,11 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
                                                 latent_spaces, input_shape,
                                                 reconstruction_loss, stop_gradient, **kwargs)
         self.n_transforms = n_transforms
-        self.encoder_multi_view = self.set_encoder_labeled()
+        self.encoder_multiview = self.set_encoder_multiview()
         self.encoder_transformed = self.set_encoder_transformed()
         self.decoder_labeled = self.set_decoder_labeled()
 
-    def set_encoder_labeled(self) -> tf.keras.models.Model:
+    def set_encoder_multiview(self) -> tf.keras.models.Model:
         multi_input_layer = tf.keras.layers.Input((self.n_transforms, *self.input_shape_))
         return self.set_encoder(multi_input_layer)
 
@@ -259,7 +256,7 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
 
         lst_transformations = []  # List of transformations
         lst_sample_avg = []  # List of averaged latent after inverse transform
-        lst_loc, lst_scale, lst_sample = self.encoder_multi_view(multi_input_layer)
+        lst_loc, lst_scale, lst_sample = self.encoder_multiview(multi_input_layer)
         for num_latent_space, latent_space in enumerate(self.latent_spaces):
             # Transformations
             assert latent_space.transformation_shape is not None, "Latent spaces with no transformation are not " \
@@ -288,14 +285,14 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
     def equivariance_loss_function(self, z_non_avg, z):
         equivariance_loss = tf.zeros(())
         for num_latent_space, latent_space in enumerate(self.latent_spaces):
-            dist_to_avg_loss = tf.reduce_sum(latent_space.distance(z_non_avg, z), axis=1) # shape (batch, n_transforms)
-            equivariance_loss += tf.reduce_mean(latent_space.dist_weight * dist_to_avg_loss, axis = 0) # shape ()
+            dist_to_avg_loss = tf.reduce_sum(latent_space.distance(z_non_avg, z), axis=1)  # shape (batch, n_transforms)
+            equivariance_loss += tf.reduce_mean(latent_space.dist_weight * dist_to_avg_loss, axis=0)  # shape ()
         return equivariance_loss
 
     def train_step(self, data):
         with tf.GradientTape() as tape:
-            image_input = data[0][0]
-            transformations = data[0][1]
+            image_input = data[0]["images"]
+            transformations = data[0]["transformations"]
             # Estimate encoder parameters and sample
             loc_parameter_estimates, scale_parameter_estimates, samples_avg, samples_nonavg = self.encoder_transformed(
                 [image_input, *transformations])
@@ -326,7 +323,7 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
             return output_dictionary
 
     def call(self, inputs, training=None, mask=None):
-        return self.encoder_multi_view(inputs)
+        return self.encoder_multiview(inputs)
 
 
 class LSBDVAE(tf.keras.Model):
@@ -362,7 +359,7 @@ class LSBDVAE(tf.keras.Model):
                                         reconstruction_loss, stop_gradient, **kwargs)
 
     def fit_semi_supervised(self, x_l, x_l_transformations, x_u, epochs, batch_size: int = 32,
-                            callback_list: Optional[List[tf.keras.callbacks.Callback]] = None) -> None:
+                            callback_list: Optional[List[tf.keras.callbacks.Callback]] = None, verbose=1) -> None:
         # assume x_l has shape (n_batches, n_transformed_datapoints, *data_shape):
         n_transformed_datapoints = x_l.shape[1]
         batch_size_l = batch_size // n_transformed_datapoints  # // to ensure integer batch size
@@ -372,12 +369,13 @@ class LSBDVAE(tf.keras.Model):
             print(f"Epoch {epoch + 1}/{epochs}")
             if len(x_l) > 0:  # don't train if there is no labelled data
                 print("Labelled training")
-                self.s_lsbd.fit([x_l, x_l_transformations],
+                self.s_lsbd.fit([{"images": x_l, "transformations": x_l_transformations}],
                                 batch_size=batch_size_l, epochs=total_epochs + 1, callbacks=callback_list,
-                                initial_epoch=total_epochs, verbose=2)
+                                initial_epoch=total_epochs, verbose=verbose)
                 total_epochs += 1
             if len(x_u) > 0:  # don't train if there is no unlabelled data
                 print("Unlabelled training")
-                self.u_lsbd.fit([x_u], batch_size=batch_size, epochs=total_epochs + 1, callbacks=callback_list,
-                                initial_epoch=total_epochs, verbose=2)
+                self.u_lsbd.fit([{"images": x_u}], batch_size=batch_size, epochs=total_epochs + 1,
+                                callbacks=callback_list,
+                                initial_epoch=total_epochs, verbose=verbose)
                 total_epochs += 1

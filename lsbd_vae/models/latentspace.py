@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
+from typing import List, Optional
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Dense, Lambda
 from tensorflow_probability import distributions as tfd

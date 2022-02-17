@@ -2,8 +2,20 @@ from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D, D
     BatchNormalization, Conv2DTranspose
 from typing import Tuple
 from tensorflow.keras.models import Model
-import tensorflow as tf
 import numpy as np
+
+
+def get_encoder_decoder(architecture: str, image_shape: Tuple[int, int, int], latent_dim: int):
+    if architecture == "dense":
+        architecture_parameters = {"input_shape": image_shape,
+                                   "dense_units_lst": (512, 512, 256, 100),
+                                   "latent_dim": latent_dim}
+        architecture_function = encoder_decoder_dense
+    else:
+        raise ValueError(f"{architecture} not defined")
+
+    encoder_backbone, decoder_backbone = architecture_function(**architecture_parameters)
+    return encoder_backbone, decoder_backbone
 
 
 def encoder_decoder_dense(latent_dim: int, input_shape: Tuple = (28, 28, 1), activation: str = "relu",
