@@ -115,3 +115,7 @@ dmypy.json
 
 # Added by luis
 .idea/
+
+# added by Loek
+run_*
+jupyter_notebooks/

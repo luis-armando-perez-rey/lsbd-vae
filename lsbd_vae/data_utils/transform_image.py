@@ -4,7 +4,7 @@ from scipy import ndimage
 from matplotlib import colors
 
 # local imports
-from lsbd_vae.data.factor_dataset import FactorImageDataset
+from lsbd_vae.data_utils.factor_dataset import FactorImageDataset
 
 
 class TransformImage(FactorImageDataset):
