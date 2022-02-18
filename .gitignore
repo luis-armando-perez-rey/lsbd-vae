@@ -119,3 +119,4 @@ dmypy.json
 # added by Loek
 run_*
 jupyter_notebooks/
+neptune_config/

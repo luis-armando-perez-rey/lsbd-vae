@@ -40,7 +40,7 @@ def get_sim_toy(root_path):
 
 
 def get_modelnet_cars(root_path,
-                      resolution=[64, 64],
+                      resolution=(64, 64),
                       intensities=np.arange(0, 6),
                       colors=np.arange(0, 6),
                       azimuths=np.arange(0, 6),
