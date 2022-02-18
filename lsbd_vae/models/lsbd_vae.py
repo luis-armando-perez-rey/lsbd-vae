@@ -102,7 +102,6 @@ class BaseLSBDVAE(tf.keras.Model):
             scale_param_estimate = tf.keras.layers.TimeDistributed(self.lst_encoder_scale[num_latent_space])(
                 input_layer)
             lst_scale.append(scale_param_estimate)  # scale parameter
-
             # Sample
             lst_sample.append(latent_space.sampling([lst_loc[-1], lst_scale[-1]]))
         # Create encoder
@@ -261,7 +260,8 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
             # Transformations
             assert latent_space.transformation_shape is not None, "Latent spaces with no transformation are not " \
                                                                   "supported "
-            transformations = tf.keras.layers.Input(shape=(self.n_transforms,) + latent_space.transformation_shape)
+            transformations = tf.keras.layers.Input(shape=(self.n_transforms,) + latent_space.transformation_shape,
+                                                    name="t" + str(num_latent_space))
             lst_transformations.append(transformations)
             # Apply to sample inverse transform
             z_sample_anchored = latent_space.inverse_transform_layer([lst_sample[num_latent_space], transformations])

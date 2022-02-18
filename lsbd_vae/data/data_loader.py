@@ -9,7 +9,7 @@ from skimage.transform import resize
 from typing import Type
 
 from lsbd_vae.data.factor_dataset import FactorImageDataset
-from transform_image import TransformImage
+from lsbd_vae.data.transform_image import TransformImage
 
 
 def load_factor_data(data, root_path=None, **kwargs) -> Type[FactorImageDataset]:

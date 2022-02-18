@@ -225,7 +225,7 @@ class FactorImageDataset:
         mask[indices] = False
         x_u = images_flat[mask]
         x_u = np.expand_dims(x_u, axis=1)  # shape (n_data_points - 2*n_labels, 1, height, width, depth)
-
+        x_l_transformations = tuple(x_l_transformations)
         return x_l, x_l_transformations, x_u
 
     def setup_cylinder_dataset_labelled_pairs(self, n_pairs: int, angle_factor: int = 1) -> (np.ndarray, List[np.ndarray], np.ndarray):
@@ -268,7 +268,7 @@ class FactorImageDataset:
         x_l = np.concatenate(x_l, axis=0)
         x_l_transformations = np.concatenate(x_l_transformations, axis=0)
         x_l_transformations = [np.zeros_like(x_l_transformations), x_l_transformations]
-        return x_l, x_l_transformations, x_u
+        return x_l, tuple(x_l_transformations), x_u
 
     def separate_by_labels(self):
         images_per_class = []
@@ -327,7 +327,7 @@ class FactorImageDataset:
         # list of n_factor arrays of shape (n_paths, path_length, 1) representing the transformations between the path
         #   elements, given as angles from 0 to 2pi
         angles_relative = np.mod(2 * np.pi * random_paths_relative / self.factors_shape, 2 * np.pi)
-        transformations = [angles_relative[:, :, i:i+1] for i in range(self.n_factors)]
+        transformations = tuple([angles_relative[:, :, i:i+1] for i in range(self.n_factors)])
 
         # images corresponding to the paths, shape (n_paths, path_length, height, width, depth)
         images_paths = np.empty((n_paths, path_length, *self.image_shape))
@@ -388,7 +388,7 @@ class FactorImageDataset:
         #   the path elements, given as angles from 0 to 2pi
         angles_relative = np.mod(2 * np.pi * paths_relative / factor_size, 2 * np.pi)
         transformations = np.reshape(angles_relative, (n_objects * n_paths, path_length))
-        transformations = [np.zeros_like(transformations), transformations]
+        transformations = tuple([np.zeros_like(transformations), transformations])
 
         # images corresponding to the paths, shape (n_paths * n_objects, path_length, height, width, depth)
         images_paths = np.empty((n_objects, n_paths, path_length, *self.image_shape))
