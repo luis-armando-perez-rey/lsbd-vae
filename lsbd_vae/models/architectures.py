@@ -1,5 +1,6 @@
 from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D, Dense, Flatten, Reshape, \
     BatchNormalization, Conv2DTranspose
+from tensorflow.keras.applications import ResNet50V2
 from typing import Tuple
 from tensorflow.keras.models import Model
 import numpy as np
@@ -11,6 +12,26 @@ def get_encoder_decoder(architecture: str, image_shape: Tuple[int, int, int], la
                                    "dense_units_lst": (512, 512, 256, 100),
                                    "latent_dim": latent_dim}
         architecture_function = encoder_decoder_dense
+    elif architecture == "resnet50v2_dense":
+        architecture_parameters = {"encoder_params": {"include_top": False,
+                                                      "weights": "imagenet",
+                                                      "pooling": "avg",
+                                                      },
+                                   "decoder_params":
+                                       {"input_shape": image_shape,
+                                        "dense_units_lst": (512, 512, 256),
+                                        "latent_dim":latent_dim}
+                                   }
+
+        def architecture_function(encoder_params, decoder_params):
+            encoder_preload = ResNet50V2(**encoder_params)
+            encoder_preload.trainable = False
+            input_layer = Input(image_shape)
+            x = encoder_preload(input_layer)
+            x = Dense(1000, activation="relu")(x)
+            encoder = Model(input_layer, x)
+            _, decoder = encoder_decoder_dense(**decoder_params)
+            return encoder, decoder
     else:
         raise ValueError(f"{architecture} not defined")
 
@@ -39,3 +60,6 @@ def encoder_decoder_dense(latent_dim: int, input_shape: Tuple = (28, 28, 1), act
     decoder = Model(dec_in, x_reconstr)
 
     return encoder, decoder
+
+
+
