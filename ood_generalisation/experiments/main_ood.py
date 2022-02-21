@@ -14,7 +14,7 @@ from lsbd_vae.models.lsbd_vae import LSBDVAE
 from lsbd_vae.models.architectures import encoder_decoder_dense
 from lsbd_vae.models.latentspace import HyperSphericalLatentSpace
 
-from ood_generalisation import presets, utils
+from ood_generalisation.modules import presets, utils
 
 
 def run_lsbdvae(save_path, data_parameters, epochs, neptune_run=None):
