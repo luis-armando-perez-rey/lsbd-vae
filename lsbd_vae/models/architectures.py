@@ -20,7 +20,7 @@ def get_encoder_decoder(architecture: str, image_shape: Tuple[int, int, int], la
                                    "decoder_params":
                                        {"input_shape": image_shape,
                                         "dense_units_lst": (512, 512, 256),
-                                        "latent_dim":latent_dim}
+                                        "latent_dim": latent_dim}
                                    }
 
         def architecture_function(encoder_params, decoder_params):

@@ -45,6 +45,47 @@ def plot_images_grid(x_array, filepath=None, neptune_run=None, cols=None, outlin
     save_show_plot(filepath, neptune_run)
 
 
+def yiq_to_rgb(yiq):
+    conv_matrix = np.array([[1., 0.956, 0.619],
+                            [1., -0.272, 0.647],
+                            [1., -1.106, 1.703]])
+    return np.tensordot(yiq, conv_matrix, axes=((-1,), (-1)))
+
+
+def yiq_embedding(theta, phi):
+    result = np.zeros(theta.shape + (3,))
+    steps = 12
+    rounding = True
+    if rounding:
+        theta_rounded = 2 * np.pi * np.round(steps * theta / (2 * np.pi)) / steps
+        phi_rounded = 2 * np.pi * np.round(steps * phi / (2 * np.pi)) / steps
+        theta = theta_rounded
+        phi = phi_rounded
+    result[..., 0] = 0.5 + 0.14 * np.cos((theta + phi) * steps / 2) - 0.2 * np.sin(phi)
+    result[..., 1] = 0.25 * np.cos(phi)
+    result[..., 2] = 0.25 * np.sin(phi)
+    return yiq_to_rgb(result)
+
+
+def plot_torus_angles(encoded_horizontal_angle, encoded_vertical_angle, colors, filepath=None, neptune_run=None):
+    fig = plt.figure(figsize=(5, 5))
+    ax = plt.gca()
+    ax.scatter(encoded_horizontal_angle, encoded_vertical_angle, color=colors)
+    ax.set_title("Torus encoded")
+    save_show_plot(filepath, neptune_run)
+
+
+def density_histogram(neg, pos, filepath=None, neptune_run=None, bins=30, alpha=0.4):
+    plt.figure()
+    plt.hist(neg, bins=bins, density=True, histtype="bar", color="g", alpha=alpha)
+    plt.hist(neg, bins=bins, density=True, histtype="step", color="g", alpha=1)
+    plt.hist(pos, bins=bins, density=True, histtype="bar", color="r", alpha=alpha)
+    plt.hist(pos, bins=bins, density=True, histtype="step", color="r", alpha=1)
+    # plt.xlabel("ELBO value")
+    plt.ylabel("Density")
+    save_show_plot(filepath, neptune_run)
+
+
 def density_histograms(values_list, names, filepath=None, neptune_run=None, bins=30, alpha=0.4):
     assert len(values_list) == len(names), "values_list and names must have the same length"
     plt.figure()

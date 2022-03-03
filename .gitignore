@@ -117,6 +117,9 @@ dmypy.json
 .idea/
 
 # added by Loek
+data/
+results/
 run_*
 jupyter_notebooks/
 neptune_config/
+.neptune/

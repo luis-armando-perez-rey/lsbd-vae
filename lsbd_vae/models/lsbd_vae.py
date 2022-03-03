@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 from typing import List, Tuple, Optional
 from lsbd_vae.models.reconstruction_losses import gaussian_loss
 from lsbd_vae.models.latentspace import LatentSpace
@@ -138,15 +139,16 @@ class BaseLSBDVAE(tf.keras.Model):
             input_images: array of shape (n_images, *image_shape)
 
         Returns:
-            List of encodings with the embeddings per latent space
+            List: List (length n_latent_spaces) of encodings (shape (n_images, ls_latent_dim)
+                with the embeddings per latent space
         """
-        encodings = []
+        encodings_list = []
         # Iterate over all the latent spaces
         for encoder_loc in self.lst_encoder_loc:
-            encodings.append(encoder_loc.predict(input_images))
-        return encodings
+            encodings_list.append(encoder_loc.predict(input_images))
+        return encodings_list
 
-    def encode_images_scale(self, input_images) -> List:
+    def encode_images_scale(self, input_images: np.array) -> List:
         """
         Takes array of images (n_images, *image_shape) and encodes them into the scale parameter of each encoder
         Args:
@@ -155,11 +157,43 @@ class BaseLSBDVAE(tf.keras.Model):
         Returns:
             List of encodings with the embeddings per latent space
         """
-        encodings_scale = []
+        encodings_scale_list = []
         # Iterate over all the latent spaces
-        for encoder_loc in self.lst_encoder_scale:
-            encodings_scale.append(encoder_loc.predict(input_images))
-        return encodings_scale
+        for encoder_scale in self.lst_encoder_scale:
+            encodings_scale_list.append(encoder_scale.predict(input_images))
+        return encodings_scale_list
+
+    def decode_latents(self, encodings_list: List[np.array]) -> np.array:
+        """
+        Takes array of latent encodings and decodes them into images
+        Args:
+            encodings_list: list of arrays of shape (n_encodings, latent_dim_l), one for each latent space
+
+        Returns:
+            images array of shape (n_encodings, *image_shape)
+        """
+        assert len(encodings_list) == len(self.latent_spaces)
+        encodings = np.concatenate(encodings_list, axis=-1)
+        return self.decoder.predict(encodings)
+
+    def reconstruct_images(self, input_images: np.array, return_latents: bool) -> (np.array, Optional[List[np.array]]):
+        """
+        Encode images and decode them again into reconstructions. Optionally include the encodings.
+        Args:
+            input_images: array of shape (n_images, *image_shape)
+            return_latents: if True, return latent encodings as well, otherwise only return reconstructions
+
+        Returns:
+            array of reconstructed images, shape (n_images, *image_shape)
+            if return_latents:
+                list of n_latent_spaces arrays of shape (n_images, latent_dim_l) of encodings per latent space
+        """
+        encodings_list = self.encode_images(input_images)
+        reconstructions = self.decode_latents(encodings_list)
+        if return_latents:
+            return reconstructions, encodings_list
+        else:
+            return reconstructions
 
     def calculate_loss_and_grads(self, reconstruction_loss, kl_loss, equivariance_loss, tape) -> None:
         total_loss = reconstruction_loss + kl_loss + equivariance_loss
