@@ -123,3 +123,4 @@ run_*
 jupyter_notebooks/
 neptune_config/
 .neptune/
+gpu_test*
