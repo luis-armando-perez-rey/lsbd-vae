@@ -40,8 +40,9 @@ class BaseLSBDVAE(tf.keras.Model):
         # Set networks
         self.lst_encoder_loc, self.lst_encoder_scale = self.set_lst_parameter_encoders()
 
+
         # Loss trackers
-        self.total_loss_tracker = tf.keras.metrics.Mean(name="total_loss")
+        self.total_loss_tracker = tf.keras.metrics.Mean(name="loss")
         self.reconstruction_loss_tracker = tf.keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = tf.keras.metrics.Mean(name="kl_loss")
         self.equivariance_tracker = tf.keras.metrics.Mean(name="equivariance_loss")
@@ -107,6 +108,14 @@ class BaseLSBDVAE(tf.keras.Model):
         # Create encoder
         encoder = tf.keras.models.Model(input_layer, [lst_loc, lst_scale, lst_sample])
         return encoder
+
+    def set_encoder_single_view(self) -> tf.keras.models.Model:
+        mult_input_layer = tf.keras.layers.Input((1, *self.input_shape_))
+        return self.set_encoder(mult_input_layer)
+
+    def set_encoder_multiview(self) -> tf.keras.models.Model:
+        multi_input_layer = tf.keras.layers.Input((self.n_transforms, *self.input_shape_))
+        return self.set_encoder(multi_input_layer)
 
     @tf.function
     def kl_loss_function(self, loc_parameter_estimates, scale_parameter_estimates):
@@ -175,16 +184,14 @@ class UnsupervisedLSBDVAE(BaseLSBDVAE):
     def __init__(self, encoder_backbones: List[tf.keras.models.Model], decoder_backbone: tf.keras.models.Model,
                  latent_spaces: List[LatentSpace], input_shape: Tuple[int, int, int],
                  reconstruction_loss=gaussian_loss(), stop_gradient: bool = False, **kwargs):
+        self.n_transforms = 1
         super(UnsupervisedLSBDVAE, self).__init__(encoder_backbones, decoder_backbone,
                                                   latent_spaces, input_shape,
                                                   reconstruction_loss, stop_gradient, **kwargs)
-
         self.encoder_single_view = self.set_encoder_single_view()
         self.decoder_unlabeled = self.set_decoder_unlabeled()
 
-    def set_encoder_single_view(self) -> tf.keras.models.Model:
-        mult_input_layer = tf.keras.layers.Input((1, *self.input_shape_))
-        return self.set_encoder(mult_input_layer)
+
 
     def set_decoder_unlabeled(self) -> tf.keras.models.Model:
         # Pass multiple codes to decoder
@@ -195,8 +202,7 @@ class UnsupervisedLSBDVAE(BaseLSBDVAE):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             # If one input is provided the training is unsupervised
-            print(data)
-            image_input = data[0]["images"]
+            image_input = data["images"]
             # Estimate encoder parameters and sample
             loc_parameter_estimates, scale_parameter_estimates, samples = self.encoder_single_view(image_input)
             z = tf.keras.layers.Concatenate(-1)(samples)
@@ -217,7 +223,7 @@ class UnsupervisedLSBDVAE(BaseLSBDVAE):
             # Total loss (SAME)
             self.calculate_loss_and_grads(reconstruction_loss, kl_loss, equivariance_loss, tape)
 
-            output_dictionary = dict(loss_u=self.total_loss_tracker.result(),
+            output_dictionary = dict(loss_s=self.total_loss_tracker.result(),
                                      reconstruction_loss_u=self.reconstruction_loss_tracker.result(),
                                      kl_loss_u=self.kl_loss_tracker.result())
         return output_dictionary
@@ -231,6 +237,7 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
     def __init__(self, encoder_backbones: List[tf.keras.models.Model], decoder_backbone: tf.keras.models.Model,
                  latent_spaces: List[LatentSpace], n_transforms: int, input_shape: Tuple[int, int, int],
                  reconstruction_loss=gaussian_loss(), stop_gradient: bool = False, **kwargs):
+
         super(SupervisedLSBDVAE, self).__init__(encoder_backbones, decoder_backbone,
                                                 latent_spaces, input_shape,
                                                 reconstruction_loss, stop_gradient, **kwargs)
@@ -291,8 +298,8 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
 
     def train_step(self, data):
         with tf.GradientTape() as tape:
-            image_input = data[0]["images"]
-            transformations = data[0]["transformations"]
+            image_input = data["images"]
+            transformations = data["transformations"]
             # Estimate encoder parameters and sample
             loc_parameter_estimates, scale_parameter_estimates, samples_avg, samples_nonavg = self.encoder_transformed(
                 [image_input, *transformations])
@@ -315,7 +322,7 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
             self.equivariance_tracker.update_state(equivariance_loss)
             # Total loss
             self.calculate_loss_and_grads(reconstruction_loss, kl_loss, equivariance_loss, tape)
-            output_dictionary = dict(loss_s=self.total_loss_tracker.result(),
+            output_dictionary = dict(loss=self.total_loss_tracker.result(),
                                      reconstruction_loss_s=self.reconstruction_loss_tracker.result(),
                                      kl_loss_s=self.kl_loss_tracker.result(),
                                      equivariance_loss_s=self.equivariance_tracker.result())
@@ -369,13 +376,13 @@ class LSBDVAE(tf.keras.Model):
             print(f"Epoch {epoch + 1}/{epochs}")
             if len(x_l) > 0:  # don't train if there is no labelled data
                 print("Labelled training")
-                self.s_lsbd.fit([{"images": x_l, "transformations": x_l_transformations}],
+                self.s_lsbd.fit({"images": x_l, "transformations": x_l_transformations},
                                 batch_size=batch_size_l, epochs=total_epochs + 1, callbacks=callback_list,
                                 initial_epoch=total_epochs, verbose=verbose)
                 total_epochs += 1
             if len(x_u) > 0:  # don't train if there is no unlabelled data
                 print("Unlabelled training")
-                self.u_lsbd.fit([{"images": x_u}], batch_size=batch_size, epochs=total_epochs + 1,
+                self.u_lsbd.fit({"images": x_u}, batch_size=batch_size, epochs=total_epochs + 1,
                                 callbacks=callback_list,
                                 initial_epoch=total_epochs, verbose=verbose)
                 total_epochs += 1

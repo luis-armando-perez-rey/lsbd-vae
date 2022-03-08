@@ -116,7 +116,9 @@ class GaussianLatentSpace(LatentSpace):
         self.dim = dim
 
         self.loc_param_layer = Dense(self.dim, name=f"guassian_mu_{self.name}")
-        self.scale_param_layer = Dense(self.dim, name=f"gaussian_log_sigma_{self.name}")
+        self.scale_param_layer = Dense(self.dim, name=f"gaussian_log_sigma_{self.name}",
+                                       bias_initializer=tf.keras.initializers.zeros,
+                                       kernel_initializer=tf.keras.initializers.zeros)
 
         self.params_layers = [self.loc_param_layer, self.scale_param_layer]
         self.transformation_shape = (1,)
@@ -270,7 +272,8 @@ class HyperSphericalLatentSpace(LatentSpace):
 
         if self.log_t_limit is None:
             print("Log t is not limited")
-            log_t_layer = Dense(1, name=f"hyperspherical_log_t_{self.name}", kernel_initializer=tf.keras.initializers.zeros)
+            log_t_layer = Dense(1, name=f"hyperspherical_log_t_{self.name}",
+                                kernel_initializer=tf.keras.initializers.zeros)
         else:
             assert isinstance(self.log_t_limit, tuple), "Log t limits is not a tuple"
             assert len(self.log_t_limit) == 2, "Log t limits should be a 2-tuple"
@@ -281,7 +284,8 @@ class HyperSphericalLatentSpace(LatentSpace):
                 time_interval_center = (self.log_t_limit[1] + self.log_t_limit[0]) / 2
                 return np.abs(half_time_interval_length) * tf.math.tanh(x) + time_interval_center
 
-            log_t_layer = Dense(1, name=f"hyperspherical_log_t_{self.name}", activation=lambda x: limit_log_t(x), bias_initializer=tf.initializers.ones, kernel_initializer=tf.keras.initializers.zeros)
+            log_t_layer = Dense(1, name=f"hyperspherical_log_t_{self.name}", activation=lambda x: limit_log_t(x),
+                                bias_initializer=tf.initializers.zeros, kernel_initializer=tf.keras.initializers.zeros)
 
         # Parameters
         self.loc_param_layer = self.LocParamLayer(self.latent_dim, self.projection)
@@ -451,7 +455,9 @@ class GaussianTorusLatentSpace(LatentSpace):
         self.dim = dim
 
         self.loc_param_layer = Dense(self.dim, name=f"guassian_mu_{self.name}")
-        self.scale_param_layer = Dense(self.dim, name=f"gaussian_log_sigma_{self.name}",bias_initializer=tf.initializers.ones, kernel_initializer=tf.keras.initializers.zeros)
+        self.scale_param_layer = Dense(self.dim, name=f"gaussian_log_sigma_{self.name}",
+                                       bias_initializer=tf.initializers.ones,
+                                       kernel_initializer=tf.keras.initializers.zeros)
         self.params_layers = [self.loc_param_layer, self.scale_param_layer]
 
     @property
