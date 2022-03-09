@@ -123,6 +123,10 @@ class RandomWalkFactor:
         return steps
 
     def _generate_image_paths_transformations(self):
+        """
+        Creates the paths to the images, the transformations and provides the labels for the random walks
+        :return:
+        """
         # Starting point for each of the random walks
         starting_point = get_random_initial(self.num_random_walks,
                                             self.max_factor_indexes)  # (batch_size, num_steps, num_factors)
@@ -154,6 +158,13 @@ class RandomWalkFactor:
         return paths, transformations, labels
 
     def _get_image_load_function(self, batch_size: int, get_labels: bool = False, flatten: bool = False):
+        """
+        Create function to apply to tf.data.Dataset data
+        :param batch_size: batch size output of the tf.data.Dataset
+        :param get_labels: whether to output the labels
+        :param flatten: whether the images should be output with shape (bath_size * length_random_walk, *image_shape)
+        :return:
+        """
         random_walk_length = self.random_walk_length
 
         def image_load(features):
