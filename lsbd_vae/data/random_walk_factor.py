@@ -61,8 +61,6 @@ class RandomWalkFactor:
         self.paths, self.transformations, self.labels = self.__generate_image_paths_transformations()
         tf.random.set_seed(None)
 
-
-
     @property
     def num_random_walks(self):
         return self.__num_random_walks
@@ -249,37 +247,31 @@ class RandomWalkIdentities(RandomWalkFactor):
     Class stores the paths corresponding to those images.
     """
 
-    def __init__(self, source_path: str, factor_values_list: List, num_random_walks: int,
+    def __init__(self, source_path: str, factor_values_list: List, num_random_walks_per_identity: int,
                  step_sizes: np.array,
                  random_walk_length: int, bool_change_factors: List[bool], image_shape: Tuple[int, int, int],
                  extension: str = ".png", labeling_function: Optional = None, seed: Optional = None):
         self.bool_fixed_factors = [not change_factor for change_factor in bool_change_factors]
-        self.fixed_indexes_meshgrid = self.__get_fixed_indexes_meshgrid(factor_values_list)
-
-        super(RandomWalkIdentities, self).__init__(source_path, factor_values_list, num_random_walks, step_sizes,
+        self.fixed_indexes_meshgrid = self.__get_fixed_indexes_mesh_grid(factor_values_list,
+                                                                         num_random_walks_per_identity)
+        total_random_walks = len(self.fixed_indexes_meshgrid[-1])
+        super(RandomWalkIdentities, self).__init__(source_path, factor_values_list,
+                                                   total_random_walks, step_sizes,
                                                    random_walk_length, bool_change_factors, image_shape,
                                                    extension, labeling_function, seed)
 
-    @property
-    def num_random_walks(self):
-        return self.__num_random_walks
-
-    @num_random_walks.setter
-    def num_random_walks(self, value):
-        value = 1 #TODO: Fix to add functionality for multiple random walks per identity
-        self.__num_random_walks = len(self.fixed_indexes_meshgrid[-1]) * value
-
-    def __get_fixed_indexes_meshgrid(self, factor_values_list):
+    def __get_fixed_indexes_mesh_grid(self, factor_values_list, num_identity_repetitions):
         fixed_factors = []
         for num_factor, factor_values in enumerate(factor_values_list):
             if self.bool_fixed_factors[num_factor]:
                 fixed_factors.append(np.arange(len(factor_values)))
-        print(len(fixed_factors))
-        meshgrids = np.meshgrid(*fixed_factors)
-        fixed_factors_meshgrid = []
-        for grid in meshgrids:
-            fixed_factors_meshgrid.append(grid.reshape(np.product(grid.shape)))
-        return fixed_factors_meshgrid
+        mesh_grids = np.meshgrid(*fixed_factors)
+        fixed_factors_mesh_grid = []
+        for grid in mesh_grids:
+            flat_grid = grid.reshape(np.product(grid.shape))
+            repeated_grid = np.tile(flat_grid, num_identity_repetitions)
+            fixed_factors_mesh_grid.append(repeated_grid)
+        return fixed_factors_mesh_grid
 
     def get_random_initial(self) -> tf.Tensor:
         initial_factors = []
