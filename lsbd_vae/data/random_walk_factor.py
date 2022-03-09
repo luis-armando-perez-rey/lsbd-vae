@@ -153,7 +153,7 @@ class RandomWalkFactor:
             labels = self.labeling_function(paths)
         return paths, transformations, labels
 
-    def _get_image_load_function(self, batch_size: int, get_labels: bool = False, flat: bool = False):
+    def _get_image_load_function(self, batch_size: int, get_labels: bool = False, flatten: bool = False):
         random_walk_length = self.random_walk_length
 
         def image_load(features):
@@ -169,14 +169,14 @@ class RandomWalkFactor:
             imgs = imgs.stack()
             if get_labels:
                 labels = features["labels"]
-                if flat:
-                    imgs = tf.reshape(imgs, (batch_size * random_walk_length, 1, *self.image_shape))
+                if flatten:
+                    imgs = tf.reshape(imgs, (batch_size * random_walk_length, *self.image_shape))
                     labels = tf.reshape(labels, (batch_size * random_walk_length,))
                 else:
                     imgs = tf.reshape(imgs, (batch_size, random_walk_length, *self.image_shape))
                 output = {"images": imgs, "transformations": transformations, "labels": labels}
             else:
-                if flat:
+                if flatten:
                     imgs = tf.reshape(imgs, (batch_size * random_walk_length, *self.image_shape))
                 else:
                     imgs = tf.reshape(imgs, (batch_size, random_walk_length, *self.image_shape))
@@ -206,7 +206,7 @@ class RandomWalkFactor:
                 {"paths": self.paths, "transformations": self.transformations, "labels": self.labels})
         ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.map(
-            self._get_image_load_function(batch_size, get_labels=self.labeling_function is not None, flat=flatten))
+            self._get_image_load_function(batch_size, get_labels=self.labeling_function is not None, flatten=flatten))
         # ds = ds.cache()
         ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
         if shuffle != 0:

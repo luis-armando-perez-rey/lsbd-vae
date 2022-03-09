@@ -39,7 +39,7 @@ class BaseLSBDVAE(tf.keras.Model):
 
         # Set networks
         self.lst_encoder_loc, self.lst_encoder_scale = self.set_lst_parameter_encoders()
-
+        self.encoder_flat = self.set_encoder_flat()
 
         # Loss trackers
         self.total_loss_tracker = tf.keras.metrics.Mean(name="loss")
@@ -90,7 +90,12 @@ class BaseLSBDVAE(tf.keras.Model):
 
         return lst_encoder_loc, lst_encoder_scale
 
-    def set_encoder(self, input_layer):
+    def set_encoder(self, input_layer: tf.keras.layers.Layer):
+        """
+        Return encoder that processes input with shape (batch_size, num_transformations, *input_shape)
+        :param input_layer: keras input layer with shape (num_transformations, *input_shape)
+        :return:
+        """
         # Pass each image through the encoder, input_layer should have shape (num_transformations, *input_shape)
         lst_sample = []  # List of samples per latent space
         lst_loc = []  # List of loc parameter per latent space
@@ -102,6 +107,28 @@ class BaseLSBDVAE(tf.keras.Model):
             lst_loc.append(loc_param_estimate)  # location parameter
             scale_param_estimate = tf.keras.layers.TimeDistributed(self.lst_encoder_scale[num_latent_space])(
                 input_layer)
+            lst_scale.append(scale_param_estimate)  # scale parameter
+            # Sample
+            lst_sample.append(latent_space.sampling([lst_loc[-1], lst_scale[-1]]))
+        # Create encoder
+        encoder = tf.keras.models.Model(input_layer, [lst_loc, lst_scale, lst_sample])
+        return encoder
+
+    def set_encoder_flat(self) -> tf.keras.models.Model:
+        """
+        Set the encoder model that can receive images with shape (n_images, *image_shape)
+        :return:
+        """
+        # Pass each image through the encoder, input_layer should have shape (num_transformations, *input_shape)
+        input_layer = tf.keras.layers.Input(self.input_shape_)
+        lst_sample = []  # List of samples per latent space
+        lst_loc = []  # List of loc parameter per latent space
+        lst_scale = []  # List of scale parameter per latent space
+        for num_latent_space, latent_space in enumerate(self.latent_spaces):
+            # Estimate parameter tensors with shape (batch_size, n_transforms, param_shape)
+            loc_param_estimate = self.lst_encoder_loc[num_latent_space](input_layer)
+            lst_loc.append(loc_param_estimate)  # location parameter
+            scale_param_estimate = self.lst_encoder_scale[num_latent_space](input_layer)
             lst_scale.append(scale_param_estimate)  # scale parameter
             # Sample
             lst_sample.append(latent_space.sampling([lst_loc[-1], lst_scale[-1]]))
@@ -140,7 +167,7 @@ class BaseLSBDVAE(tf.keras.Model):
         ]
         return list_metrics
 
-    def encode_images(self, input_images) -> List:
+    def encode_images(self, input_images) -> tf.TensorArray:
         """
         Takes array of images (n_images, *image_shape) and encodes them into the location parameter of each encoder
         Args:
@@ -149,10 +176,8 @@ class BaseLSBDVAE(tf.keras.Model):
         Returns:
             List of encodings with the embeddings per latent space
         """
-        encodings = []
-        # Iterate over all the latent spaces
-        for encoder_loc in self.lst_encoder_loc:
-            encodings.append(encoder_loc.predict(input_images))
+
+        encodings = self.encoder_flat.predict(input_images)[0]
         return encodings
 
     def encode_images_scale(self, input_images) -> List:
@@ -164,11 +189,20 @@ class BaseLSBDVAE(tf.keras.Model):
         Returns:
             List of encodings with the embeddings per latent space
         """
-        encodings_scale = []
-        # Iterate over all the latent spaces
-        for encoder_loc in self.lst_encoder_scale:
-            encodings_scale.append(encoder_loc.predict(input_images))
+        encodings_scale = self.encoder_flat.predict(input_images)[1]
         return encodings_scale
+
+    def reconstruct_images(self, input_images):
+        """
+        Encode and decode images of shape (n_images, *image_shape)
+        :param input_images:
+        :return:
+        """
+        encodings = self.encode_images(input_images)
+        # Concatenate all latent representations
+        encodings = tf.concat(encodings, axis=-1)
+        reconstructed_images = self.decoder(encodings)
+        return reconstructed_images
 
     def calculate_loss_and_grads(self, reconstruction_loss, kl_loss, equivariance_loss, tape) -> None:
         total_loss = reconstruction_loss + kl_loss + equivariance_loss
@@ -190,8 +224,6 @@ class UnsupervisedLSBDVAE(BaseLSBDVAE):
                                                   reconstruction_loss, stop_gradient, **kwargs)
         self.encoder_single_view = self.set_encoder_single_view()
         self.decoder_unlabeled = self.set_decoder_unlabeled()
-
-
 
     def set_decoder_unlabeled(self) -> tf.keras.models.Model:
         # Pass multiple codes to decoder
