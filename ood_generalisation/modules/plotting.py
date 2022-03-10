@@ -67,11 +67,14 @@ def yiq_embedding(theta, phi):
     return yiq_to_rgb(result)
 
 
-def plot_torus_angles(encoded_horizontal_angle, encoded_vertical_angle, colors, filepath=None, neptune_run=None):
+def plot_torus_angles(encoded_horizontal_angle, encoded_vertical_angle, colors, filepath=None, neptune_run=None,
+                      xlim=(-np.pi, np.pi), ylim=(-np.pi, np.pi)):
     fig = plt.figure(figsize=(5, 5))
     ax = plt.gca()
     ax.scatter(encoded_horizontal_angle, encoded_vertical_angle, color=colors)
     ax.set_title("Torus encoded")
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
     save_show_plot(filepath, neptune_run)
 
 

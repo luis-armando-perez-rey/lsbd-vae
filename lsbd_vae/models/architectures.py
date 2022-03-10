@@ -62,4 +62,52 @@ def encoder_decoder_dense(latent_dim: int, input_shape: Tuple = (28, 28, 1), act
     return encoder, decoder
 
 
+def encoder_decoder_vgglike_2d(latent_dim: int, input_shape: Tuple = (64, 64, 1), activation: str = "relu",
+                               filters_lst: Tuple = (128, 64, 32), dense_units_lst: Tuple = (64,),
+                               kernel_size: int = 3, pool_size: int = 2,):
+    """
+    Simple but general convolutional architecture. Uses fixed kernel_size & pool_size. Customisable nr of conv2d layers,
+    optional dense layers.
+    """
+    n_conv_layers = len(filters_lst)
+    height, width, depth = input_shape
+    # calculate sizes after convolutions (before dense layers)
+    conv_height = height // (pool_size ** n_conv_layers)
+    conv_width = width // (pool_size ** n_conv_layers)
+    conv_depth = filters_lst[-1]
+    assert height == conv_height * (pool_size ** n_conv_layers), "height must be a multiple of pool_size^n_conv_layers"
+    assert width == conv_width * (pool_size ** n_conv_layers), "width must be a multiple of pool_size^n_conv_layers"
 
+    # ENCODER
+    x = Input(shape=input_shape)
+    # convolutional layers
+    h = x
+    for i in range(n_conv_layers):
+        h = Conv2D(filters=filters_lst[i], kernel_size=kernel_size, strides=(1, 1), padding="same",
+                   activation=activation)(h)
+        h = MaxPooling2D(pool_size=pool_size, padding="same")(h)
+    # dense layers
+    h = Flatten()(h)
+    for units in dense_units_lst:
+        h = Dense(units, activation=activation)(h)
+    encoder = Model(x, h)
+
+    # DECODER
+    dec_in = Input(shape=(latent_dim,))
+    # dense layers
+    h = dec_in
+    for units in reversed(dense_units_lst):
+        h = Dense(units, activation=activation)(h)
+    h = Dense(conv_height * conv_width * conv_depth, activation=activation)(h)
+    h = Reshape((conv_height, conv_width, conv_depth))(h)
+    # convolutional layers
+    for i in reversed(range(1, n_conv_layers)):
+        h = UpSampling2D(size=pool_size)(h)
+        h = Conv2D(filters=filters_lst[i - 1], kernel_size=kernel_size, strides=(1, 1), padding="same",
+                   activation=activation)(h)
+    h = UpSampling2D(size=pool_size)(h)
+    x_reconstr = Conv2D(filters=depth, kernel_size=kernel_size, strides=(1, 1), padding="same",
+                        activation="sigmoid")(h)
+    decoder = Model(dec_in, x_reconstr)
+
+    return encoder, decoder

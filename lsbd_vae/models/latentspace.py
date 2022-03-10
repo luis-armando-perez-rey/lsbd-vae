@@ -60,6 +60,9 @@ class LatentSpace:
         """KL Divergence from approximate posterior q(z|x) to prior p(x)"""
         raise NotImplementedError()
 
+    def kl_loss_weighted(self, enc_params):
+        return self.kl_weight * self.kl_loss(enc_params)
+
     def sample_from_prior(self, batch_shape):
         """sample random points from the prior, e.g. for generating data"""
         raise NotImplementedError()
@@ -135,7 +138,7 @@ class GaussianLatentSpace(LatentSpace):
     def kl_loss(self, enc_params):
         mu, log_sigma = enc_params
         kl_loss = - 0.5 * K.sum(1 + 2 * log_sigma - K.square(mu) - K.exp(2 * log_sigma), axis=-1)
-        return kl_loss * self.kl_weight
+        return kl_loss
 
     def sample_from_prior(self, batch_shape):
         return np.random.normal(size=batch_shape + (self.dim,), loc=0, scale=1)
@@ -231,7 +234,7 @@ class DiracDeltaLatentSpace(LatentSpace):
 
     def kl_loss(self, enc_params):
         kl_loss = 0.0
-        return kl_loss * self.kl_weight
+        return kl_loss
 
     def average(self, z):
         n_transformations = int(z.shape[-2])  # z has shape (*batch_dims, n_transformed_datapoints, latent_dim)
@@ -345,7 +348,7 @@ class HyperSphericalLatentSpace(LatentSpace):
                   + np.log(volume) \
                   + scalar_curv * K.exp(log_t) / 4.0
         kl_loss = K.squeeze(kl_loss, axis=-1)  # remove final dimension (which should always have size 1)
-        return kl_loss * self.kl_weight
+        return kl_loss
 
     def sample_from_prior(self, batch_shape):
         # TODO: make rejection sampling to prevent problems with near-zero norms
@@ -473,7 +476,7 @@ class GaussianTorusLatentSpace(LatentSpace):
     def kl_loss(self, enc_params):
         mu, log_sigma = enc_params
         kl_loss = - 0.5 * K.sum(1 + 2 * log_sigma - K.square(mu) - K.exp(2 * log_sigma), axis=-1)
-        return kl_loss * self.kl_weight
+        return kl_loss
 
     def sample_from_prior(self, batch_shape):
         return np.random.normal(size=batch_shape + (self.dim,), loc=0, scale=1)

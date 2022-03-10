@@ -3,9 +3,9 @@ import numpy as np
 
 def select_factor_combinations(factor_values, factor_ranges):
     """
-    Given a array of factor values, and a range of values to select for each factor,
+    Given an array of factor values, and a range of values to select for each factor,
     returns the indices for which the factor values fall within all those ranges,
-    as well as the remaining indices where at least one factor value is outside of the given range.
+    as well as the remaining indices where at least one factor value is outside the given range.
 
     Args:
         factor_values (np.array): array of shape (n_datapoints, n_factors) containing the factor values data
@@ -19,7 +19,7 @@ def select_factor_combinations(factor_values, factor_ranges):
     for i in range(n_factors):
         assert len(factor_ranges[i]) == 2, "elements of factor_ranges must be 2-tuples of (min, max) values"
         truefalse_current = np.logical_and(factor_values[:, i] >= factor_ranges[i][0],
-                                           factor_values[:, i] <= factor_ranges[i][1])
+                                           factor_values[:, i] < factor_ranges[i][1])
         if i == 0:
             truefalse_global = truefalse_current
         else:

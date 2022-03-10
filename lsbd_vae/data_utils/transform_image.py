@@ -37,13 +37,14 @@ class TransformImage(FactorImageDataset):
         height, width, depth = input_images.shape[-3:]
 
         images = input_images
+        images_dtype = images.dtype
         factor_values_list = []
         max_factor_values = []
         factor_names = []
         # 1. rotate images (must be done before translations, to ensure objects are rotated around their centre)
         if n_rotations is not None:
             assert n_rotations > 1, "n_rotations should be larger than 1"
-            new_images = np.empty((n_rotations, *images.shape))
+            new_images = np.empty((n_rotations, *images.shape), dtype=images_dtype)
             for i in range(n_rotations):
                 angle = i * 360 / n_rotations  # ndimage.rotate uses degrees, not radians
                 new_images[i] = ndimage.rotate(images, angle, axes=(-2, -3), reshape=False,
@@ -60,7 +61,7 @@ class TransformImage(FactorImageDataset):
             assert n_hues > 1, "n_hues should be larger than 1"
             assert depth == 3, "input_images must be RGB to perform hue shift"
             images_hsv = colors.rgb_to_hsv(images)
-            new_images_hsv = np.empty((n_hues, *images.shape))
+            new_images_hsv = np.empty((n_hues, *images.shape), dtype=images_dtype)
             for i in range(n_hues):
                 hue = i / n_hues  # hues are given from 0 to 1
                 new_images_hsv[i, ...] = images_hsv
@@ -84,7 +85,7 @@ class TransformImage(FactorImageDataset):
         if step_size_hor is not None:
             assert step_size_hor > 0, "step_size_hor should be larger than 0"
             grid_size_hor = int(np.ceil(width / step_size_hor))
-            new_images = np.empty((grid_size_hor, *images.shape))
+            new_images = np.empty((grid_size_hor, *images.shape), dtype=images_dtype)
             for pos_hor in range(grid_size_hor):
                 new_images[pos_hor] = np.roll(images, pos_hor * step_size_hor, axis=-2)
             images = new_images
@@ -98,7 +99,7 @@ class TransformImage(FactorImageDataset):
         if step_size_vert is not None:
             assert step_size_vert > 0, "step_size_vert should be larger than 0"
             grid_size_vert = int(np.ceil(height / step_size_vert))
-            new_images = np.empty((grid_size_vert, *images.shape))
+            new_images = np.empty((grid_size_vert, *images.shape), dtype=images_dtype)
             for pos_vert in range(grid_size_vert):
                 new_images[pos_vert] = np.roll(images, pos_vert * step_size_vert, axis=-3)
             images = new_images

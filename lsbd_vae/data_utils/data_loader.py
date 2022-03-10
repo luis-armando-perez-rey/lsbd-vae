@@ -15,6 +15,7 @@ from lsbd_vae.data_utils.transform_image import TransformImage
 def load_factor_data(data, root_path=None, **kwargs) -> Type[FactorImageDataset]:
     options_dict = {
         "sim_toy": get_sim_toy,
+        "dsprites": get_dsprites,
         "modelnet_colors": get_modelnet_colors,
         "pixel": get_transformed_pixel,
         "arrow": get_transformed_arrow,
@@ -37,6 +38,39 @@ def get_sim_toy(root_path):
     factor_names = ["object_color", "object_shape", "object_size", "camera_height", "background_color",
                     "horizontal_axis", "vertical_axis"]
     return FactorImageDataset(images, factor_names=factor_names)
+
+
+def get_dsprites(root_path, noncyclic_gap=0.1):
+    """
+
+    Args:
+        root_path: path where the data folder is
+        correct_rotational_symmetries: if True, angles for squares are multiplied by 4, and for ellipses by 2
+        noncyclic_gap: for assigning angular values to the factor values, this represents the percentage of a circle
+            that will not have any factor values assigned to it, for factors that are not cyclic. E.g. if factor values
+            are from 0 to 0.9, and the noncyclic_gap is 0.1, the max_factor_value will be 1.
+
+    Returns:
+
+    """
+    assert root_path is not None, "project root path is not supplied"
+    dsprites_path = os.path.join(root_path, "data", "dsprites", "dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz")
+    with np.load(dsprites_path, encoding="latin1", allow_pickle=True) as f:
+        images = f["imgs"]  # np array of shape (737280, 64, 64) containing 0's and 1's (dtype uint8)
+        factor_values_dict = f["metadata"].item()["latents_possible_values"]
+    images = images.reshape((3, 6, 40, 32, 32, 64, 64, 1)).astype("float32")
+    factor_names = ["shape", "scale", "orientation", "x_pos", "y_pos"]
+    factor_values_list = [
+        factor_values_dict["shape"] - 1,  # values are given as 1, 2, 3, subtract 1 to start from 0. Factor values are
+                                          # then: 0=square, 1=ellips, 2=heart
+        (factor_values_dict["scale"] - 0.5) * 2,  # values are given in [0.5, 1.], rescale to be in [0., 1.]
+        np.mod(factor_values_dict["orientation"], 2*np.pi),  # last value is 2*pi, so should be converted to 0
+        factor_values_dict["posX"],
+        factor_values_dict["posY"]
+    ]
+    max_factor_values = [3, 1 / (1 - noncyclic_gap), 2 * np.pi, 1 / (1 - noncyclic_gap), 1 / (1 - noncyclic_gap)]
+    return FactorImageDataset(images, max_factor_values=max_factor_values, factor_names=factor_names,
+                              factor_values_list=factor_values_list)
 
 
 def get_modelnet_cars(root_path,

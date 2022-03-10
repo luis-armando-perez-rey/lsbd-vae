@@ -13,28 +13,64 @@ sys.path.append(ROOT_PATH)
 # local imports
 from lsbd_vae.data_utils.data_loader import load_factor_data
 from lsbd_vae.models.lsbd_vae import LSBDVAE
-from lsbd_vae.models.architectures import encoder_decoder_dense
+from lsbd_vae.models import architectures
 from lsbd_vae.models.latentspace import HyperSphericalLatentSpace
 
 from ood_generalisation.modules import presets, utils, evaluation, data_selection
 
 
-def run_lsbdvae(save_path, data_parameters, factor_ranges, epochs, neptune_run=None):
+def get_architectures(architecture: str, **kwargs):
+    if architecture == "dense":
+        dense_units_lst = (512, 256)
+        return architectures.encoder_decoder_dense(dense_units_lst=dense_units_lst, **kwargs)
+    elif architecture == "conv":
+        filters_lst = (128, 64, 32)
+        dense_units_lst = (64,)
+        return architectures.encoder_decoder_vgglike_2d(
+            filters_lst=filters_lst, dense_units_lst=dense_units_lst, **kwargs)
+    else:
+        raise ValueError(f"{architecture} not defined")
+
+
+def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, epochs: int, batch_size: int,
+                architecture: str, neptune_run=None, correct_dsprites_symmetries=False):
     # region =setup data_class and latent spaces=
     dataset_class = load_factor_data(root_path=ROOT_PATH, **data_parameters)
-    latent_spaces = [HyperSphericalLatentSpace(1), HyperSphericalLatentSpace(1)]
+    latent_spaces = []
+    for _ in range(dataset_class.n_factors):
+        latent_spaces.append(HyperSphericalLatentSpace(1))
     input_shape = dataset_class.image_shape
     latent_dim = sum([ls.latent_dim for ls in latent_spaces])
     # endregion
 
     # region =split up in training data and ood data=
     images = dataset_class.flat_images
-    factor_values = dataset_class.flat_factor_mesh_as_angles
-    indices_ood, indices_train = data_selection.select_factor_combinations(factor_values, factor_ranges)
-    images_train = images[indices_train]
-    factor_values_train = factor_values[indices_train]
-    images_ood = images[indices_ood]
-    factor_values_ood = factor_values[indices_ood]
+
+    if correct_dsprites_symmetries and data_parameters["data"] == "dsprites":
+        factor_values_grid = dataset_class.factor_mesh_as_angles
+        # factor0 is shape: 0=square, 1=ellips, 2=heart. factor2 is orientation (axis5 contains factor values)
+        # project angles for square onto 90 degrees, and ellips onto 180 degrees, then rescale back to 360 degrees
+        factor_values_grid[0, :, :, :, :, 2] = np.mod(factor_values_grid[0, :, :, :, :, 2], 0.5*np.pi) * 4
+        factor_values_grid[1, :, :, :, :, 2] = np.mod(factor_values_grid[1, :, :, :, :, 2], np.pi) * 2
+        factor_values = np.reshape(factor_values_grid, (-1, 5))
+        # TODO: make sure that evaluation code also uses these factor values, not from the dataset_class
+    else:
+        if data_parameters["data"] == "dsprites":
+            print("correct_dsprites_symmetries is set to True, but the data isn't dsprites, ignoring this parameter")
+        factor_values_grid = dataset_class.factor_mesh_as_angles
+        factor_values = dataset_class.flat_factor_mesh_as_angles
+
+    if factor_ranges is None:
+        images_train = images
+        factor_values_train = factor_values
+        images_ood = None
+        factor_values_ood = None
+    else:
+        indices_ood, indices_train = data_selection.select_factor_combinations(factor_values, factor_ranges)
+        images_train = images[indices_train]
+        factor_values_train = factor_values[indices_train]
+        images_ood = images[indices_ood]
+        factor_values_ood = factor_values[indices_ood]
     # endregion
 
     # region =setup (semi-)supervised train dataset=
@@ -50,35 +86,45 @@ def run_lsbdvae(save_path, data_parameters, factor_ranges, epochs, neptune_run=N
     if neptune_run is not None:
         neptune_callback = utils.NeptuneMonitor(neptune_run)
         callbacks.append(neptune_callback)
-    encoder, decoder = encoder_decoder_dense(latent_dim=latent_dim, input_shape=input_shape)
+    encoder, decoder = get_architectures(architecture, latent_dim=latent_dim, input_shape=input_shape)
+    print("\n=== Encoder Architecture: ===")
+    encoder.summary()
+    print("\n=== Decoder Architecture: ===")
+    decoder.summary()
+    print()
     lsbdvae = LSBDVAE([encoder], decoder, latent_spaces, 2, input_shape=input_shape)
     lsbdvae.s_lsbd.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
-    lsbdvae.s_lsbd.fit(x={"images": x_l, "transformations": x_l_transformations}, epochs=epochs, callbacks=callbacks)
+    lsbdvae.s_lsbd.fit(x={"images": x_l, "transformations": x_l_transformations}, epochs=epochs, batch_size=batch_size,
+                       callbacks=callbacks)
     # endregion
 
     # region =EVALUATIONS=
     # reconstructions of training data
     print("... plotting reconstructions")
     n_samples = 10
-    x_l_flat = x_l.reshape((-1, *x_l.shape[2:]))
-    indices = np.random.choice(len(x_l_flat), size=n_samples, replace=False)
-    x_samples = x_l_flat[indices]
+    indices = np.random.choice(len(images_train), size=n_samples, replace=False)
+    x_samples = images_train[indices]
     evaluation.plot_reconstructions(lsbdvae.u_lsbd, x_samples, save_path / "reconstructions_train", neptune_run)
     # reconstructions of ood data
-    indices = np.random.choice(len(images_ood), size=n_samples, replace=False)
-    x_samples = images_ood[indices]
-    evaluation.plot_reconstructions(lsbdvae.u_lsbd, x_samples, save_path / "reconstructions_ood", neptune_run)
+    if images_ood is not None:
+        indices = np.random.choice(len(images_ood), size=n_samples, replace=False)
+        x_samples = images_ood[indices]
+        evaluation.plot_reconstructions(lsbdvae.u_lsbd, x_samples, save_path / "reconstructions_ood", neptune_run)
 
-    # latent traversals (in 2d grid for 2 factors)
-    print("... plotting torus embeddings")
-    evaluation.plot_2d_torus_embedding(dataset_class, lsbdvae.u_lsbd, save_path / "2d_embedding", neptune_run)
+    # torus embeddings & latent traversals (in 2d grid for 2 factors)
+    print("... plotting torus embeddings & latent traversals")
+    for i in range(dataset_class.n_factors-1):
+        for j in range(i+1, dataset_class.n_factors):
+            evaluation.plot_2d_latent_traverals_torus(lsbdvae.u_lsbd, 10, save_path / f"2d_traversals_torus_{i}_{j}",
+                                                      neptune_run, x_dim=i, y_dim=j)
+            evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_grid, lsbdvae.u_lsbd,
+                                               save_path / f"2d_embedding_{i}_{j}", neptune_run, x_dim=i, y_dim=j)
 
     # density plots for training vs ood
-    print("... plotting latent traversals")
-    evaluation.plot_2d_latent_traverals_torus(lsbdvae.u_lsbd, 10, save_path / "2d_traversals_torus", neptune_run)
-
-    # print("... plotting density plots")
-    # endregion
+    if images_ood is not None:
+        print("... plotting density plots")
+        evaluation.ood_detection(lsbdvae.u_lsbd, images_train, images_ood, save_path / "ood_detection", neptune_run)
+        # endregion
 
 
 def main(kwargs_lsbdvae):
@@ -126,10 +172,14 @@ def main(kwargs_lsbdvae):
 
 if __name__ == "__main__":
     kwargs_lsbdvae_ = {
-        "data_parameters": presets.SQUARE_PARAMETERS,
+        # "data_parameters": presets.SQUARE_PARAMETERS,
         # "data_parameters": presets.ARROW_PARAMETERS,
-        "factor_ranges": ((1.5 * np.pi, 2 * np.pi), (1.5 * np.pi, 2 * np.pi)),
-        "epochs": 1,
+        "data_parameters": {"data": "dsprites"},
+        "factor_ranges": None,
+        "epochs": 10,
+        "batch_size": 128,
+        "architecture": "dense",  # "dense", "conv"
+        "correct_dsprites_symmetries": True,
     }
 
     main(kwargs_lsbdvae_)
