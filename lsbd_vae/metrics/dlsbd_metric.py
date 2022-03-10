@@ -99,7 +99,7 @@ def dlsbd_k_torus(z, k, verbose=0):
     assert n_subgroups == len(k), "Parameter k should be the same size as the number of subgroups"
     angles_regular = [get_regular_angles(num_angles) for num_angles in num_angles_tuple]
     # All possible combinations of the regular angles
-    angles_combinations = np.array(np.meshgrid(*angles_regular, indexing = "ij"))
+    angles_combinations = np.array(np.meshgrid(*angles_regular, indexing="ij"))
 
     # color map
     angles_flat = angles_combinations.reshape(n_subgroups, -1)
@@ -114,20 +114,63 @@ def dlsbd_k_torus(z, k, verbose=0):
         mean = np.mean(pc_g, axis=0)
         var = np.mean(np.sum((pc_g - mean) ** 2, axis=-1), axis=0)
         equivariances_list.append(var)
-    return np.sum(equivariances_list), equivariances_list
+    return np.mean(equivariances_list), equivariances_list
 
 
+def dlsbd_k_cylinder(z, k, verbose=0):
+    """
+    D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
+    :param z:
+    :param angles_combinations:
+    :param k:
+    :param plot:
+    :param verbose:
+    :return:
+    """
+    # Regular spacing of angles in [0,2pi)
+    # assume z_dim has shape (*n_angles, z_dim)
+    num_objects = z.shape[0]
+    num_angles_tuple = z.shape[1:-1]
+    n_subgroups = len(num_angles_tuple)
+    assert n_subgroups == len(k), "Parameter k should be the same size as the number of subgroups"
+    angles_regular = [get_regular_angles(num_angles) for num_angles in num_angles_tuple]
 
-def dlsbd_torus(z_loc, k_values, verbose=0) -> Tuple[float, int]:
+    # All possible combinations of the regular angles
+    angles_combinations = np.array(np.meshgrid(*angles_regular, indexing="ij"))
+
+    # color map
+    angles_flat = angles_combinations.reshape(n_subgroups, -1)
+
+    # The mean latent for each group (angles_per_group, z_dim, n_groups)
+    equivariances_list = []
+    for num_object in range(num_objects):
+        for num_transformation in range(n_subgroups):
+            g_element_flat = calculate_zg_flat(z[num_object], num_transformation)
+            projected = calculate_pca_zg(g_element_flat)
+            pc_g = calculate_projected_zg0(projected, k[num_transformation], angles_flat[num_transformation])
+            # compute metric
+            mean = np.mean(pc_g, axis=0)
+            var = np.mean(np.sum((pc_g - mean) ** 2, axis=-1), axis=0)
+            equivariances_list.append(var)
+    return np.mean(equivariances_list), equivariances_list
+
+
+def dlsbd(z_loc, k_values, verbose=0, factor_manifold: str = "torus") -> Tuple[float, int]:
     """
     :param z_loc:
     :param k_values:
     :param verbose:
     :return:
     """
+    available_manifolds = ["torus", "cylinder"]
+    assert factor_manifold in available_manifolds, f"Factor manifold {factor_manifold} not available possible values " \
+                                                   f"{available_manifolds}"
     metric_values = np.zeros(len(k_values))
     for num_k, k in enumerate(k_values):
-        metric_values[num_k] = np.sum(dlsbd_k_torus(z_loc, k=k, verbose=verbose)[0])
+        if factor_manifold == "torus":
+            metric_values[num_k] = np.sum(dlsbd_k_torus(z_loc, k=k, verbose=verbose)[0])
+        elif factor_manifold == "cylinder":
+            metric_values[num_k] = np.sum(dlsbd_k_cylinder(z_loc, k=k, verbose=verbose)[0])
         if verbose == 1:
             print("Combination number {} for k = {}, score = {}".format(num_k, k, metric_values[num_k]))
     score = np.amin(metric_values)
@@ -146,5 +189,5 @@ def create_combinations_k_values_range(start_value: int = -10, end_value: int = 
     num_k = len(values)
     values_repeated = [values] * n_transforms
     k_values = np.array(np.meshgrid(*values_repeated, indexing="ij"))
-    k_values = np.moveaxis(k_values.reshape((n_transforms, num_k **n_transforms)), -1, 0)
+    k_values = np.moveaxis(k_values.reshape((n_transforms, num_k ** n_transforms)), -1, 0)
     return k_values
