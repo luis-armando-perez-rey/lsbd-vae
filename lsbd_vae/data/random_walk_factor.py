@@ -255,6 +255,7 @@ class RandomWalkIdentities(RandomWalkFactor):
         self.fixed_indexes_meshgrid = self.__get_fixed_indexes_mesh_grid(factor_values_list,
                                                                          num_random_walks_per_identity)
         total_random_walks = len(self.fixed_indexes_meshgrid[-1])
+        print("Total random walks", total_random_walks)
         super(RandomWalkIdentities, self).__init__(source_path, factor_values_list,
                                                    total_random_walks, step_sizes,
                                                    random_walk_length, bool_change_factors, image_shape,
@@ -281,9 +282,7 @@ class RandomWalkIdentities(RandomWalkFactor):
                 random_initial = tf.random.uniform((self.num_random_walks, 1),
                                                    maxval=self.max_factor_indexes[num_factor], dtype=tf.int32)
                 initial_factors.append(random_initial)
-                print("Random", random_initial.shape)
             else:
                 initial_factors.append(np.expand_dims(self.fixed_indexes_meshgrid[num_fixed], axis=-1))
-                print("Fixed", np.expand_dims(self.fixed_indexes_meshgrid[num_fixed], axis=-1).shape)
                 num_fixed += 1
         return tf.stack(initial_factors, axis=-1)
