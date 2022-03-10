@@ -17,13 +17,35 @@ def plot_reconstructions(lsbd, x, filepath, neptune_run=None):
     plotting.plot_images_grid(x_array, filepath=filepath, neptune_run=neptune_run)
 
 
-def plot_2d_torus_embedding(images_grid, factor_values_grid, lsbd, filepath, neptune_run=None, x_dim=0, y_dim=1):
+def plot_circle_embeddings(images, factor_values_as_angles, lsbd, filepath, neptune_run=None, n_samples=500):
+    """
+    F = number of factors (and number of latent spaces)
+
+    Args:
+        images: shape (n_images, h, w, d)
+        factor_values_as_angles: shape (n_images, F), given as angles
+        lsbd: BaseLSBDVAE instance or subclass
+        filepath:
+        neptune_run:
+        n_samples: how many points to plot
+    """
+    sample_indices = np.random.choice(len(images), size=n_samples, replace=False)
+    images_sample = images[sample_indices]
+    factor_values_sample = factor_values_as_angles[sample_indices]
+    encodings_list = lsbd.encode_images(images_sample)
+    for factor in range(factor_values_as_angles.shape[-1]):
+        colors = factor_values_sample[:, factor]
+        filepath_factor = filepath.parent / (filepath.name + f"_{factor}.pdf")
+        plotting.plot_circle_embedding(encodings_list[factor], colors, filepath_factor, neptune_run)
+
+
+def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, filepath, neptune_run=None, x_dim=0, y_dim=1):
     """
     F = number of factors (and number of latent spaces)
 
     Args:
         images_grid: shape (n1, ..., nF, h, w, d)
-        factor_values_grid:  shape (n1, ..., nF, F)
+        factor_values_as_angles_grid:  shape (n1, ..., nF, F), given as angles
         lsbd: BaseLSBDVAE instance or subclass
         filepath:
         neptune_run:
@@ -33,14 +55,14 @@ def plot_2d_torus_embedding(images_grid, factor_values_grid, lsbd, filepath, nep
     assert x_dim != y_dim, "first and second dimensions should not be the same"
     assert x_dim < lsbd.n_latent_spaces and y_dim < lsbd.n_latent_spaces
 
-    for factor, factor_size in enumerate(factor_values_grid.shape[:-1]):
+    for factor, factor_size in enumerate(factor_values_as_angles_grid.shape[:-1]):
         if factor != x_dim and factor != y_dim:
             random_factor_index = np.random.randint(factor_size)
             # take single element for this factor index, [] brackets ensure that dimension is kept (with size 1)
             images_grid = np.take(images_grid, [random_factor_index], axis=factor)  # size of dim factor is changed to 1
-            factor_values_grid = np.take(factor_values_grid, [random_factor_index], axis=factor)
+            factor_values_as_angles_grid = np.take(factor_values_as_angles_grid, [random_factor_index], axis=factor)
     flat_images = np.reshape(images_grid, (-1, *images_grid.shape[-3:]))
-    flat_factor_mesh = np.reshape(factor_values_grid, (-1, factor_values_grid.shape[-1]))
+    flat_factor_mesh = np.reshape(factor_values_as_angles_grid, (-1, factor_values_as_angles_grid.shape[-1]))
 
     encodings_list = lsbd.encode_images(flat_images)
     # encoded list is a list of length n_latent_spaces, each item is an array of shape (n, ls_latent_dim)

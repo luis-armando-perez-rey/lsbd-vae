@@ -33,12 +33,13 @@ def get_architectures(architecture: str, **kwargs):
 
 
 def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, epochs: int, batch_size: int,
-                architecture: str, neptune_run=None, correct_dsprites_symmetries=False):
+                architecture: str, log_t_limit: tuple = (-10, -6), neptune_run=None, correct_dsprites_symmetries=False,
+                use_angles_for_selection=True):
     # region =setup data_class and latent spaces=
     dataset_class = load_factor_data(root_path=ROOT_PATH, **data_parameters)
     latent_spaces = []
     for _ in range(dataset_class.n_factors):
-        latent_spaces.append(HyperSphericalLatentSpace(1))
+        latent_spaces.append(HyperSphericalLatentSpace(1, log_t_limit=log_t_limit))
     input_shape = dataset_class.image_shape
     latent_dim = sum([ls.latent_dim for ls in latent_spaces])
     # endregion
@@ -46,37 +47,53 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     # region =split up in training data and ood data=
     images = dataset_class.flat_images
 
+    # regular factor values are needed to select factor combinations given factor_ranges,
+    # factor values as angles are needed for LSBD-VAE training
     if correct_dsprites_symmetries and data_parameters["data"] == "dsprites":
-        factor_values_grid = dataset_class.factor_mesh_as_angles
+        factor_values_grid = dataset_class.factor_mesh
+        factor_values_as_angles_grid = dataset_class.factor_mesh_as_angles
         # factor0 is shape: 0=square, 1=ellips, 2=heart. factor2 is orientation (axis5 contains factor values)
-        # project angles for square onto 90 degrees, and ellips onto 180 degrees, then rescale back to 360 degrees
-        factor_values_grid[0, :, :, :, :, 2] = np.mod(factor_values_grid[0, :, :, :, :, 2], 0.5*np.pi) * 4
+        # project angles for square onto 90 degrees, then rescale back to 360 degrees
+        factor_values_grid[0, :, :, :, :, 2] = np.mod(factor_values_grid[0, :, :, :, :, 2], 0.5 * np.pi) * 4
+        factor_values_as_angles_grid[0, :, :, :, :, 2] = \
+            np.mod(factor_values_as_angles_grid[0, :, :, :, :, 2], 0.5 * np.pi) * 4
+        # project angles for ellips onto 180 degrees, then rescale back to 360 degrees
         factor_values_grid[1, :, :, :, :, 2] = np.mod(factor_values_grid[1, :, :, :, :, 2], np.pi) * 2
+        factor_values_as_angles_grid[1, :, :, :, :, 2] = \
+            np.mod(factor_values_as_angles_grid[1, :, :, :, :, 2], np.pi) * 2
+        # flatten
         factor_values = np.reshape(factor_values_grid, (-1, 5))
+        factor_values_as_angles = np.reshape(factor_values_as_angles_grid, (-1, 5))
         # TODO: make sure that evaluation code also uses these factor values, not from the dataset_class
     else:
         if data_parameters["data"] == "dsprites":
             print("correct_dsprites_symmetries is set to True, but the data isn't dsprites, ignoring this parameter")
-        factor_values_grid = dataset_class.factor_mesh_as_angles
-        factor_values = dataset_class.flat_factor_mesh_as_angles
+        factor_values_grid = dataset_class.factor_mesh
+        factor_values_as_angles_grid = dataset_class.factor_mesh_as_angles
+        factor_values = dataset_class.flat_factor_mesh
+        factor_values_as_angles = dataset_class.flat_factor_mesh_as_angles
 
     if factor_ranges is None:
         images_train = images
-        factor_values_train = factor_values
+        factor_values_as_angles_train = factor_values_as_angles
         images_ood = None
-        factor_values_ood = None
+        factor_values_as_angles_ood = None
     else:
-        indices_ood, indices_train = data_selection.select_factor_combinations(factor_values, factor_ranges)
+        if use_angles_for_selection:
+            indices_ood, indices_train = \
+                data_selection.select_factor_combinations(factor_values_as_angles, factor_ranges)
+        else:
+            indices_ood, indices_train = data_selection.select_factor_combinations(factor_values, factor_ranges)
         images_train = images[indices_train]
-        factor_values_train = factor_values[indices_train]
+        factor_values_as_angles_train = factor_values_as_angles[indices_train]
         images_ood = images[indices_ood]
-        factor_values_ood = factor_values[indices_ood]
+        factor_values_as_angles_ood = factor_values_as_angles[indices_ood]
     # endregion
 
     # region =setup (semi-)supervised train dataset=
     n_labels = len(images_train) // 2  # fully supervised
-    x_l, x_l_transformations, x_u = data_selection.setup_circles_dataset_labelled_pairs(images_train,
-                                                                                        factor_values_train, n_labels)
+    x_l, x_l_transformations, x_u = \
+        data_selection.setup_circles_dataset_labelled_pairs(images_train, factor_values_as_angles_train, n_labels)
     print("X_l shape", x_l.shape, "num transformations", len(x_l_transformations), "x_u len", len(x_u))
     print("transformations shape:", x_l_transformations[0].shape)
     # endregion
@@ -117,14 +134,19 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
         for j in range(i+1, dataset_class.n_factors):
             evaluation.plot_2d_latent_traverals_torus(lsbdvae.u_lsbd, 10, save_path / f"2d_traversals_torus_{i}_{j}",
                                                       neptune_run, x_dim=i, y_dim=j)
-            evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_grid, lsbdvae.u_lsbd,
+            evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_as_angles_grid, lsbdvae.u_lsbd,
                                                save_path / f"2d_embedding_{i}_{j}", neptune_run, x_dim=i, y_dim=j)
+
+    # circle embeddings, one for each latent space
+    print("... plotting circle embeddings")
+    evaluation.plot_circle_embeddings(images, factor_values_as_angles, lsbdvae.u_lsbd, save_path / "circle_embeddings",
+                                      neptune_run)
 
     # density plots for training vs ood
     if images_ood is not None:
         print("... plotting density plots")
         evaluation.ood_detection(lsbdvae.u_lsbd, images_train, images_ood, save_path / "ood_detection", neptune_run)
-        # endregion
+    # endregion
 
 
 def main(kwargs_lsbdvae):
@@ -172,13 +194,14 @@ def main(kwargs_lsbdvae):
 
 if __name__ == "__main__":
     kwargs_lsbdvae_ = {
-        # "data_parameters": presets.SQUARE_PARAMETERS,
-        # "data_parameters": presets.ARROW_PARAMETERS,
-        "data_parameters": {"data": "dsprites"},
+        # "data_parameters": presets.SQUARE_PARAMETERS, "use_angles_for_selection": True,
+        # "data_parameters": presets.ARROW_PARAMETERS, "use_angles_for_selection": True,
+        "data_parameters": {"data": "dsprites"}, "use_angles_for_selection": False,
         "factor_ranges": None,
         "epochs": 10,
         "batch_size": 128,
         "architecture": "dense",  # "dense", "conv"
+        "log_t_limit": (-10, -9),
         "correct_dsprites_symmetries": True,
     }
 

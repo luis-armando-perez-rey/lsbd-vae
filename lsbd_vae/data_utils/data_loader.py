@@ -65,10 +65,16 @@ def get_dsprites(root_path, noncyclic_gap=0.1):
                                           # then: 0=square, 1=ellips, 2=heart
         (factor_values_dict["scale"] - 0.5) * 2,  # values are given in [0.5, 1.], rescale to be in [0., 1.]
         np.mod(factor_values_dict["orientation"], 2*np.pi),  # last value is 2*pi, so should be converted to 0
-        factor_values_dict["posX"],
-        factor_values_dict["posY"]
+        factor_values_dict["posX"],  # values from 0.0 to 1.0
+        factor_values_dict["posY"],  # values from 0.0 to 1.0
     ]
-    max_factor_values = [3, 1 / (1 - noncyclic_gap), 2 * np.pi, 1 / (1 - noncyclic_gap), 1 / (1 - noncyclic_gap)]
+    max_factor_values = [
+        3,
+        1 / (1 - noncyclic_gap),
+        2 * np.pi,
+        1 / (1 - noncyclic_gap),
+        1 / (1 - noncyclic_gap)
+    ]
     return FactorImageDataset(images, max_factor_values=max_factor_values, factor_names=factor_names,
                               factor_values_list=factor_values_list)
 

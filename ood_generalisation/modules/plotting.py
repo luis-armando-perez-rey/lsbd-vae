@@ -78,6 +78,14 @@ def plot_torus_angles(encoded_horizontal_angle, encoded_vertical_angle, colors, 
     save_show_plot(filepath, neptune_run)
 
 
+def plot_circle_embedding(encodings, colors, filepath=None, neptune_run=None, xlim=(-1.1, 1.1), ylim=(-1.1, 1.1)):
+    plt.figure(figsize=(5, 5))
+    plt.scatter(encodings[:, 0], encodings[:, 1], c=colors, cmap="hsv", vmin=0, vmax=2 * np.pi)
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+    save_show_plot(filepath, neptune_run)
+
+
 def density_histogram(neg, pos, filepath=None, neptune_run=None, bins=30, alpha=0.4):
     plt.figure()
     plt.hist(neg, bins=bins, density=True, histtype="bar", color="g", alpha=alpha)
