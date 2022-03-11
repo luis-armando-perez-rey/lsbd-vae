@@ -4,6 +4,145 @@ import numpy as np
 import os
 
 
+def load_images_paths(flat_paths, image_shape):
+    images = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+    for path in flat_paths:
+        image = tf.image.decode_image(tf.io.read_file(path))[:, :, :image_shape[-1]]
+        image = tf.cast(image, tf.float32)
+        images = images.write(images.size(), image / 255.)
+    images = images.stack()
+    return images
+
+
+class FactorCombinations:
+    def __init__(self, source_path: str, factor_values_list: List,
+                 image_shape: Tuple[int, int, int], identity_boolean: List[bool],
+                 extension: str = ".png", labeling_function: Optional = None):
+        # Factor variables
+        self.factor_values_list = factor_values_list
+        self.num_factors = len(factor_values_list)
+        self.identity_boolean = identity_boolean
+
+        self.max_factor_indexes = np.array([len(factor) for factor in factor_values_list]).astype(np.int32)
+        self.factor_indexes = [np.arange(max_factor_index) for max_factor_index in self.max_factor_indexes]
+        self.factor_shapes = tuple([self.max_factor_indexes[num_factor] for num_factor in range(self.num_factors) if
+                                    not self.identity_boolean[num_factor]])
+        self.identities_shape = tuple([self.max_factor_indexes[num_factor] for num_factor in range(self.num_factors) if
+                                       self.identity_boolean[num_factor]])
+
+        self.total_identities = np.product(self.identities_shape)
+        self.total_factor_combinations = np.product(self.factor_shapes)
+
+        # Image variables
+        self.image_shape = image_shape
+        self.labeling_function = labeling_function
+
+        # Path variables
+        self.source_path = source_path
+        self.extension = extension
+
+        # Assertions
+        assert np.ndim(identity_boolean) == 1, "Dimension of mask should be 1"
+        assert len(identity_boolean) == len(
+            factor_values_list), "Length of mask should be the same as the length of factor values"
+
+        self.paths = self.__get_paths()
+        self.labels = self.__get_labels()
+
+    def __gather_factor_string_meshgrid(self, factor_index_meshgrid):
+        factor_string_meshgrid = []
+        for num_factor in range(self.num_factors):
+            # Gather factor values according to the corresponding factor states
+            factor_values = tf.gather(self.factor_values_list[num_factor], factor_index_meshgrid[num_factor])
+            factor_string_meshgrid.append(factor_values)
+        return factor_string_meshgrid
+
+    def __get_paths(self):
+        """
+        Takes factor_states and produces paths to the corresponding images
+        :return:
+        """
+        # Make list of states with factor values per factor
+        factor_index_meshgrid = tf.meshgrid(*self.factor_indexes, indexing="ij")
+        factor_string_meshgrid = self.__gather_factor_string_meshgrid(factor_index_meshgrid)
+        filenames = tf.strings.join(factor_string_meshgrid, separator="_")
+        # Join states to image extension
+        filenames = tf.strings.join([filenames, ".png"], separator="")
+        # Create paths from source path
+        paths = tf.strings.join([self.source_path, filenames], separator=os.sep)
+        paths = tf.reshape(paths, (self.total_identities, *self.factor_shapes))
+        return paths
+
+    def __get_labels(self):
+        """
+        Gets the labels from the paths using the labeling function if defined.
+        :return:
+        """
+        if self.labeling_function is None:
+            labels = None
+        else:
+            labels = self.labeling_function(self.paths)
+        return labels
+
+    def __get_image_load_function(self, batch_size: int, get_labels: bool = False, flatten: bool = False):
+        """
+        Create function to apply to tf.data.Dataset data
+        :param batch_size: batch size output of the tf.data.Dataset
+        :param get_labels: whether to output the labels
+        :param flatten: whether the images should be output with shape (bath_size * length_random_walk, *image_shape)
+        :return:
+        """
+
+        def image_load(features):
+            paths = features["paths"]
+
+            flat_paths = tf.reshape(paths, (batch_size * self.total_factor_combinations,))
+            images = load_images_paths(flat_paths, self.image_shape)
+            if get_labels:
+                labels = features["labels"]
+                if flatten:
+                    images = tf.reshape(images, (batch_size * self.total_factor_combinations, *self.image_shape))
+                    labels = tf.reshape(labels, (batch_size * self.total_factor_combinations,))
+                else:
+                    images = tf.reshape(images, (batch_size, *self.factor_shapes, *self.image_shape))
+                output = {"images": images, "labels": labels}
+            else:
+                if flatten:
+                    images = tf.reshape(images, (batch_size * self.total_factor_combinations, *self.image_shape))
+                else:
+                    images = tf.reshape(images, (batch_size, *self.factor_shapes, *self.image_shape))
+                output = {"images": images}
+            return output
+
+        return image_load
+
+    def get_tfdataset(self, batch_size: int, shuffle: int = 1000, flatten: bool = False) -> tf.data.Dataset:
+        """
+        Get tensorflow dataset from random walk
+        :param flatten: whether to provide a tfdataset that outputs flattened data i.e. with shape
+        (num_random_walks * random_walk_length, *image_shape)
+        :param batch_size:
+        :param shuffle: number of datapoints to be taken during shuffle if equal to 0 then no shuffle is added
+        :return:
+        """
+        if self.total_identities % batch_size != 0:
+            print(
+                f"WARNING: Number of random walks {self.total_identities} is not a multiple of batch size {batch_size}."
+                f"Some random walks will be dropped each iteration")
+        if self.labels is None:
+            ds = tf.data.Dataset.from_tensor_slices({"paths": self.paths})
+        else:
+            ds = tf.data.Dataset.from_tensor_slices({"paths": self.paths, "labels": self.labels})
+        ds = ds.batch(batch_size, drop_remainder=True)
+        ds = ds.map(
+            self.__get_image_load_function(batch_size, get_labels=self.labeling_function is not None, flatten=flatten))
+        # ds = ds.cache()
+        ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+        if shuffle != 0:
+            ds = ds.shuffle(shuffle)
+        return ds
+
+
 class RandomWalkFactor:
     """
     Class that can be used to create tf.data.Dataset that loads images within a source_path with naming structure
@@ -186,12 +325,7 @@ class RandomWalkFactor:
             transformations = features["transformations"]
 
             flat_paths = tf.reshape(paths, (batch_size * random_walk_length,))
-            imgs = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
-            for path in flat_paths:
-                image = tf.image.decode_image(tf.io.read_file(path))[:, :, :self.image_shape[-1]]
-                image = tf.cast(image, tf.float32)
-                imgs = imgs.write(imgs.size(), image / 255.)
-            imgs = imgs.stack()
+            imgs = load_images_paths(flat_paths, self.image_shape)
             if get_labels:
                 labels = features["labels"]
                 if flatten:
