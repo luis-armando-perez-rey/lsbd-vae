@@ -1,5 +1,5 @@
 import tensorflow as tf
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Callable
 import numpy as np
 import os
 
@@ -16,19 +16,19 @@ def load_images_paths(flat_paths, image_shape):
 
 class FactorCombinations:
     def __init__(self, source_path: str, factor_values_list: List,
-                 image_shape: Tuple[int, int, int], identity_boolean: List[bool],
-                 extension: str = ".png", labeling_function: Optional = None):
+                 image_shape: Tuple[int, int, int], factor_boolean: List[bool],
+                 extension: str = ".png", labeling_function: Optional[Callable] = None):
         # Factor variables
         self.factor_values_list = factor_values_list
         self.num_factors = len(factor_values_list)
-        self.identity_boolean = identity_boolean
+        self.factor_boolean = factor_boolean
 
         self.max_factor_indexes = np.array([len(factor) for factor in factor_values_list]).astype(np.int32)
         self.factor_indexes = [np.arange(max_factor_index) for max_factor_index in self.max_factor_indexes]
         self.factor_shapes = tuple([self.max_factor_indexes[num_factor] for num_factor in range(self.num_factors) if
-                                    not self.identity_boolean[num_factor]])
+                                     self.factor_boolean[num_factor]])
         self.identities_shape = tuple([self.max_factor_indexes[num_factor] for num_factor in range(self.num_factors) if
-                                       self.identity_boolean[num_factor]])
+                                       not self.factor_boolean[num_factor]])
 
         self.total_identities = np.product(self.identities_shape)
         self.total_factor_combinations = np.product(self.factor_shapes)
@@ -42,8 +42,8 @@ class FactorCombinations:
         self.extension = extension
 
         # Assertions
-        assert np.ndim(identity_boolean) == 1, "Dimension of mask should be 1"
-        assert len(identity_boolean) == len(
+        assert np.ndim(factor_boolean) == 1, "Dimension of mask should be 1"
+        assert len(factor_boolean) == len(
             factor_values_list), "Length of mask should be the same as the length of factor values"
 
         self.paths = self.__get_paths()
@@ -197,7 +197,7 @@ class RandomWalkFactor:
     def __init__(self, source_path: str, factor_values_list: List, num_random_walks: int,
                  step_sizes: np.array,
                  random_walk_length: int, bool_change_factors: List[bool], image_shape: Tuple[int, int, int],
-                 extension: str = ".png", labeling_function: Optional = None, seed: Optional = None):
+                 extension: str = ".png", labeling_function: Optional[Callable] = None, seed: Optional[int] = None):
         """
         Initialize class
         :param source_path: path were images are stored
@@ -428,7 +428,7 @@ class RandomWalkIdentities(RandomWalkFactor):
     def __init__(self, source_path: str, factor_values_list: List, num_random_walks_per_identity: int,
                  step_sizes: np.array,
                  random_walk_length: int, bool_change_factors: List[bool], image_shape: Tuple[int, int, int],
-                 extension: str = ".png", labeling_function: Optional = None, seed: Optional = None):
+                 extension: str = ".png", labeling_function: Optional[Callable] = None, seed: Optional[int] = None):
         self.bool_fixed_factors = [not change_factor for change_factor in bool_change_factors]
         self.fixed_indexes_meshgrid = self.__get_fixed_indexes_mesh_grid(factor_values_list,
                                                                          num_random_walks_per_identity)
