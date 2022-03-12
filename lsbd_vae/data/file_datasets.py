@@ -92,23 +92,23 @@ class FactorCombinations:
         :param flatten: whether the images should be output with shape (bath_size * length_random_walk, *image_shape)
         :return:
         """
-
+        total_factor_combinations = self.total_factor_combinations
         def image_load(features):
             paths = features["paths"]
 
-            flat_paths = tf.reshape(paths, (batch_size * self.total_factor_combinations,))
+            flat_paths = tf.reshape(paths, (batch_size * total_factor_combinations,))
             images = load_images_paths(flat_paths, self.image_shape)
             if get_labels:
                 labels = features["labels"]
                 if flatten:
-                    images = tf.reshape(images, (batch_size * self.total_factor_combinations, *self.image_shape))
-                    labels = tf.reshape(labels, (batch_size * self.total_factor_combinations,))
+                    images = tf.reshape(images, (batch_size * total_factor_combinations, *self.image_shape))
+                    labels = tf.reshape(labels, (batch_size * total_factor_combinations,))
                 else:
                     images = tf.reshape(images, (batch_size, *self.factor_shapes, *self.image_shape))
                 output = {"images": images, "labels": labels}
             else:
                 if flatten:
-                    images = tf.reshape(images, (batch_size * self.total_factor_combinations, *self.image_shape))
+                    images = tf.reshape(images, (batch_size * total_factor_combinations, *self.image_shape))
                 else:
                     images = tf.reshape(images, (batch_size, *self.factor_shapes, *self.image_shape))
                 output = {"images": images}
@@ -116,12 +116,31 @@ class FactorCombinations:
 
         return image_load
 
+    def __get_image_load_function_flat_paths(self, get_labels: bool = False):
+        """
+        Create function to apply to tf.data.Dataset data
+        :param batch_size: batch size output of the tf.data.Dataset
+        :param get_labels: whether to output the labels
+        :param flatten: whether the images should be output with shape (bath_size * length_random_walk, *image_shape)
+        :return:
+        """
+        def image_load(features):
+            flat_paths = features["paths"]
+            images = load_images_paths(flat_paths, self.image_shape)
+            labels = features["labels"]
+            if get_labels:
+                output = {"images": images, "labels": labels}
+            else:
+                output = {"images": images}
+            return output
+        return image_load
+
     def get_tfdataset(self, batch_size: int, shuffle: int = 1000, flatten: bool = False) -> tf.data.Dataset:
         """
-        Get tensorflow dataset from random walk
+        Get tensorflow dataset that outputs batches of object identities and all possible combinations of the factors
+        :param batch_size: number of identities to output each call to the function
         :param flatten: whether to provide a tfdataset that outputs flattened data i.e. with shape
-        (num_random_walks * random_walk_length, *image_shape)
-        :param batch_size:
+        (batch_size * nfactor1 * nfactor2 * ... * nfactorN, *image_shape)
         :param shuffle: number of datapoints to be taken during shuffle if equal to 0 then no shuffle is added
         :return:
         """
@@ -140,6 +159,31 @@ class FactorCombinations:
         ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
         if shuffle != 0:
             ds = ds.shuffle(shuffle)
+        return ds
+
+    def get_tfdataset_flat(self, batch_size: int) -> tf.data.Dataset:
+        """
+        Get tensorflow dataset that produces ordered images which can be re-ordered into
+        (n_identities, factor1, factor2, ... factorN, *image_shape) after complete data load. No shuffling is allowed
+        and data is output flat by design.
+        :param batch_size: number of images to be output
+        :return:
+        """
+        flat_paths = tf.reshape(self.paths, tf.reduce_prod(self.paths.shape))
+        if flat_paths.shape[0] % batch_size != 0:
+            print(
+                f"WARNING: Number of random walks {self.total_identities} is not a multiple of batch size {batch_size}."
+                f"Some random walks will be dropped each iteration")
+
+        if self.labels is None:
+            ds = tf.data.Dataset.from_tensor_slices({"paths": flat_paths})
+        else:
+            flat_labels = tf.reshape(self.labels, tf.reduce_prod(self.labels.shape))
+            ds = tf.data.Dataset.from_tensor_slices({"paths": flat_paths, "labels": flat_labels})
+        ds = ds.batch(batch_size, drop_remainder=True)
+        ds = ds.map(self.__get_image_load_function_flat_paths(get_labels=self.labeling_function is not None))
+        # ds = ds.cache()
+        ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
         return ds
 
 
