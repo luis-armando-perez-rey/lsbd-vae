@@ -52,9 +52,9 @@ def test_train_slsbd_vae():
     fake_transformations = (2 * np.pi * tf.random.uniform((TOTAL_DATA, NUM_VIEWS, 1)),
                             tf.ones((TOTAL_DATA, NUM_VIEWS, 1)))
 
-    ulsbd = SupervisedLSBDVAE([encoder], decoder, latent_spaces, NUM_VIEWS, input_shape=input_shape)
-    ulsbd.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
-    ulsbd.fit(x={"images": fake_data, "transformations": fake_transformations}, epochs=EPOCHS)
+    s_lsbd = SupervisedLSBDVAE([encoder], decoder, latent_spaces, NUM_VIEWS, input_shape=input_shape)
+    s_lsbd.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
+    s_lsbd.fit(x={"images": fake_data, "transformations": fake_transformations}, epochs=EPOCHS)
     return 0
 
 
@@ -76,7 +76,7 @@ def test_train_lsbd_vae():
 
 
 if __name__ == "__main__":
-    # test_train_ulsbd_vae()
+    test_train_ulsbd_vae()
     test_train_slsbd_vae()
-    # test_train_lsbd_vae()
+    test_train_lsbd_vae()
     print("Everything passed")
