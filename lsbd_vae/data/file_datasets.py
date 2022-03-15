@@ -445,7 +445,14 @@ class RandomWalkIdentities(RandomWalkFactor):
                                                    random_walk_length, bool_change_factors, image_shape,
                                                    extension, labeling_function, seed)
 
-    def __get_fixed_indexes_mesh_grid(self, factor_values_list, num_identity_repetitions):
+    def __get_fixed_indexes_mesh_grid(self, factor_values_list: List, num_identity_repetitions: int) -> np.array:
+        """
+        Returns the identities used in each of the random walks. Each identity consisting of the combination of fixed
+        factors in the factor values list is represented in num_identity_repetitions random walks.
+        :param factor_values_list: list of factor values
+        :param num_identity_repetitions: number of times an identity should be repeated to generate a random walk
+        :return: numpy array of shape (num_identities *  num_identity_repetitions)
+        """
         fixed_factors = []
         for num_factor, factor_values in enumerate(factor_values_list):
             if self.bool_fixed_factors[num_factor]:
