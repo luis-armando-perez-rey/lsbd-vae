@@ -101,7 +101,7 @@ class PathsTransformationsLabels:
                         [tf.reshape(transformation, (batch_size * paths_per_group,)) for transformation in
                          transformations])
                 output.update({"transformations": transformations})
-            return output
+            return output, None  # output tuple since Tensorflow is accostumed to be fit with x,y data
 
         return image_load
 
@@ -224,7 +224,7 @@ class FactorCombinations(PathsTransformationsLabels):
                 output = {"images": images, "labels": labels}
             else:
                 output = {"images": images}
-            return output
+            return output, None  # output tuple since Tensorflow is accostumed to be fit with x,y data
 
         return image_load
 
@@ -284,7 +284,8 @@ class RandomWalkFactor(PathsTransformationsLabels):
         :param image_shape: Shape of images to be loaded
         :param extension: Extensions of the images to be loaded
         """
-        tf.random.set_seed(seed)
+        self.seed = seed
+        tf.random.set_seed(self.seed)
         # Factor variables
         self.factor_values_list = factor_values_list
         self.num_factors = len(factor_values_list)
