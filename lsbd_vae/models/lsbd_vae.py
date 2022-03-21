@@ -34,12 +34,14 @@ class BaseLSBDVAE(tf.keras.Model):
         # Backbones
         self.encoder_backbones = encoder_backbones
         self.decoder = decoder_backbone
-        assert self.decoder.inputs[0].shape[
-                   -1] == self.latent_dim, "The decoder backbone should receive tensors of shape (batch_size, " \
-                                           "latent_dim) "
+        assert self.decoder.inputs[0].shape[-1] == self.latent_dim,\
+            "The decoder backbone should receive tensors of shape (batch_size, latent_dim)"
 
         # Set networks
         self.lst_encoder_loc, self.lst_encoder_scale = self.set_lst_parameter_encoders()
+        self.encoder_flat = self.set_encoder_flat()
+        self.decoder_from_list = self.set_decoder_from_list()
+        self.loss_model = self.set_loss_model()
 
         # Loss trackers
         self.total_loss_tracker = tf.keras.metrics.Mean(name="total_loss")
@@ -113,7 +115,29 @@ class BaseLSBDVAE(tf.keras.Model):
         encoder = tf.keras.models.Model(input_layer, [lst_loc, lst_scale, lst_sample])
         return encoder
 
-    @tf.function
+    def set_encoder_flat(self) -> tf.keras.models.Model:
+        """
+        Set the encoder model that can receive images with shape (n_images, *image_shape)
+        :return:
+        """
+        # Pass each image through the encoder, input_layer should have shape (num_transformations, *input_shape)
+        input_layer = tf.keras.layers.Input(self.input_shape_)
+        lst_sample = []  # List of samples per latent space
+        lst_loc = []  # List of loc parameter per latent space
+        lst_scale = []  # List of scale parameter per latent space
+        for num_latent_space, latent_space in enumerate(self.latent_spaces):
+            # Estimate parameter tensors with shape (batch_size, n_transforms, param_shape)
+            loc_param_estimate = self.lst_encoder_loc[num_latent_space](input_layer)
+            lst_loc.append(loc_param_estimate)  # location parameter
+            scale_param_estimate = self.lst_encoder_scale[num_latent_space](input_layer)
+            lst_scale.append(scale_param_estimate)  # scale parameter
+            # Sample
+            lst_sample.append(latent_space.sampling([lst_loc[-1], lst_scale[-1]]))
+        # Create encoder
+        encoder = tf.keras.models.Model(input_layer, [lst_loc, lst_scale, lst_sample])
+        return encoder
+
+    # @tf.function
     def kl_loss_function(self, loc_parameter_estimates, scale_parameter_estimates, use_kl_weight=True):
         kl_losses = []
         for num_latent_space, latent_space in enumerate(self.latent_spaces):
@@ -144,6 +168,18 @@ class BaseLSBDVAE(tf.keras.Model):
         self.kl_loss_tracker.update_state(kl_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
 
+    def set_decoder_from_list(self):
+        """
+        Decoder model that can be applied directly on a list of encodings, so you don't need to concatenate encodings.
+        This can help prevent Out-Of-Memory issues for larger datasets.
+        """
+        encodings_list_input = []
+        for ls in self.latent_spaces:
+            encodings_list_input.append(tf.keras.layers.Input((ls.latent_dim,)))
+        dec_in = tf.keras.layers.Concatenate(-1)(encodings_list_input)
+        dec_out = self.decoder(dec_in)
+        return tf.keras.Model(encodings_list_input, dec_out)
+
     # API FUNCTIONS
     def encode_images(self, input_images) -> List:
         """
@@ -152,33 +188,38 @@ class BaseLSBDVAE(tf.keras.Model):
             input_images: array of shape (n_images, *image_shape)
 
         Returns:
-            List: List (length n_latent_spaces) of encodings (shape (n_images, ls_latent_dim)
-                with the embeddings per latent space
+            Three lists of length n_latent_spaces each; of encodings, scale parameters and samples
         """
-        encodings_list = []
-        # Iterate over all the latent spaces
-        for encoder_loc in self.lst_encoder_loc:
-            encodings_list.append(encoder_loc.predict(input_images))
-        return encodings_list
+        lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
+        return lst_loc
 
-    def encode_images_scale(self, input_images: np.array) -> List:
+    def encode_images_scale(self, input_images) -> List:
         """
-        Takes array of images (n_images, *image_shape) and encodes them into the scale parameter of each encoder
+        Takes array of images (n_images, *image_shape) and encodes them into the location parameter of each encoder
         Args:
             input_images: array of shape (n_images, *image_shape)
 
         Returns:
-            List of encodings with the embeddings per latent space
+            Three lists of length n_latent_spaces each; of encodings, scale parameters and samples
         """
-        encodings_scale_list = []
-        # Iterate over all the latent spaces
-        for encoder_scale in self.lst_encoder_scale:
-            encodings_scale_list.append(encoder_scale.predict(input_images))
-        return encodings_scale_list
+        lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
+        return lst_scale
+
+    def encode_images_loc_scale(self, input_images) -> List:
+        """
+        Takes array of images (n_images, *image_shape) and encodes them into the location parameter of each encoder
+        Args:
+            input_images: array of shape (n_images, *image_shape)
+
+        Returns:
+            Three lists of length n_latent_spaces each; of encodings, scale parameters and samples
+        """
+        lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
+        return lst_loc, lst_scale
 
     def decode_latents(self, encodings_list: List[np.array]) -> np.array:
         """
-        Takes array of latent encodings and decodes them into images
+        Takes list of latent encodings arrays and decodes them into images
         Args:
             encodings_list: list of arrays of shape (n_encodings, latent_dim_l), one for each latent space
 
@@ -186,8 +227,7 @@ class BaseLSBDVAE(tf.keras.Model):
             images array of shape (n_encodings, *image_shape)
         """
         assert len(encodings_list) == len(self.latent_spaces)
-        encodings = np.concatenate(encodings_list, axis=-1)
-        return self.decoder.predict(encodings)
+        return self.decoder_from_list.predict(encodings_list)
 
     def reconstruct_images(self, input_images: np.array, return_latents: bool) -> (np.array, Optional[List[np.array]]):
         """
@@ -208,14 +248,30 @@ class BaseLSBDVAE(tf.keras.Model):
         else:
             return reconstructions
 
+    def set_loss_model(self) -> tf.keras.Model:
+        """
+        Set model that can receive images with shape (n_images, *image_shape) and returns loss components
+            [reconstruction_loss, kl_loss, elbo]. Can be used to obtain individual loss values for each input.
+        """
+        input_layer = tf.keras.layers.Input(self.input_shape_)
+        lst_loc, lst_scale, lst_sample = self.encoder_flat(input_layer)
+        reconstructions = self.decoder_from_list(lst_loc)
+        reconstruction_losses = self.reconstruction_loss(input_layer, reconstructions)
+        kl_losses = self.kl_loss_function(lst_loc, lst_scale, use_kl_weight=False)
+        elbos = - reconstruction_losses - kl_losses
+        return tf.keras.Model(input_layer, [reconstruction_losses, kl_losses, elbos])
+
     def compute_losses_and_elbos(self, input_images: np.array):
+        return self.loss_model.predict(input_images)
+
+    # TODO: remove if above works
+    def compute_losses_and_elbos_old(self, input_images: np.array):
         input_images = tf.cast(input_images, tf.float32)  # cast to float32 to avoid mismatch when computing reconstr.
-        encodings_list = self.encode_images(input_images)
-        encodings_scale_list = self.encode_images_scale(input_images)
+        encodings_list, scale_list = self.encode_images_loc_scale(input_images)
         reconstructions = self.decode_latents(encodings_list)
 
         reconstruction_losses = self.reconstruction_loss(input_images, reconstructions)  # shape (n_images)
-        kl_losses = self.kl_loss_function(encodings_list, encodings_scale_list, use_kl_weight=False)  # shape (n_images)
+        kl_losses = self.kl_loss_function(encodings_list, scale_list, use_kl_weight=False)  # shape (n_images)
         elbos = - reconstruction_losses - kl_losses
 
         return reconstruction_losses, kl_losses, elbos

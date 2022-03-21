@@ -85,3 +85,64 @@ def setup_circles_dataset_labelled_pairs(images, factor_values, n_labels, max_fa
     x_u = np.expand_dims(x_u, axis=1)  # shape (n_data_points - 2*n_labels, 1, height, width, depth)
     x_l_transformations = tuple(x_l_transformations)
     return x_l, x_l_transformations, x_u
+
+
+def setup_circles_dataset_labelled_batches(images, factor_values, n_batches, batch_size, max_factor_values=None):
+    """
+    Args:
+        images (np.array): data array of shape (n_datapoints, *input_dim)
+        factor_values (np.array): array of factor values, shape (n_datapoints, n_factors)
+        n_batches: Number of labelled batches to generate
+        batch_size: size of each labelled batch
+        max_factor_values (np.array): array-like of shape (n_factors), containing the max value for each factor
+            (assuming min value is 0), all factor values will be scaled w.r.t. this value to be between 0 and 2*Pi
+    Returns:
+        x_l: Labeled pairs array with shape (n_labels, 2, height, width, depth)
+        x_l_transformations: List of length n_factors, each element is an array of shape (n_labels, 2, 1)
+            where [:, 0, :] represents the identity transformations,
+            and [:, 1, :] represents the transformation from the first to the second element of a pair,
+            given as an angle on the unit circle
+        x_u: Unlabeled data points with shape (n_data_points - 2*n_labels, 1, height, width, depth)
+    """
+    # labelling procedure: randomly select n_labels batches of size batch_size,
+    #   such that each data point is part of at most one batch.
+    # produce the transformation label for each of those batches.
+    n_datapoints = len(images)
+    assert len(factor_values) == n_datapoints, "len(images) and len(factor_values) must be equal"
+    assert batch_size * n_batches <= n_datapoints,\
+        "for this procedure batch_size * n_labels cannot exceed the number of data points"
+    n_factors = factor_values.shape[1]
+    if max_factor_values is not None:
+        assert len(max_factor_values) == n_factors, "n_factors in factor_values and max_factor_values is not equal"
+    else:
+        max_factor_values = n_factors * [2 * np.pi]
+
+    # sample batch_size*n_labels indices, for the data points/pairs to be labelled
+    indices = np.random.choice(n_datapoints, size=batch_size * n_batches, replace=False)
+    # split in batch_size parts, for the consecutive elements of the batches
+    indices_partitioned = [indices[i * n_batches: (i+1) * n_batches] for i in range(batch_size)]
+
+    x_l_transformations = []
+    for factor_num in range(n_factors):
+        angles_factor = []
+        for batch_pos in range(batch_size):
+            differences = (factor_values[indices_partitioned[batch_pos], factor_num]
+                           - factor_values[indices_partitioned[0], factor_num]) \
+                          % max_factor_values[factor_num]  # shape (n_batches)
+            angles = np.expand_dims(2 * np.pi * differences / max_factor_values[factor_num], axis=1) # (n_batches, 1)
+            angles_factor.append(angles)
+        transformations_factor = np.stack(angles_factor, axis=1)  # shape (n_batches, batch_size, 1)
+        x_l_transformations.append(transformations_factor)  # length n_factors after for-loop
+
+    # set up the set x_l of labelled data points, with shape (n_batches, batch_size, height, width, depth)
+    x_l_lst = [images[ind] for ind in indices_partitioned]  # length batch_size, elements of shape (n_batches, h, w, d)
+    x_l = np.stack(x_l_lst, axis=1)  # shape (n_batches, batch_size, height, width, depth)
+
+    # select all remaining data points for the unlabelled set x_u,
+    #   with shape (n_unlabelled, 1, height, width, depth)
+    mask = np.ones(n_datapoints, dtype=bool)
+    mask[indices] = False
+    x_u = images[mask]
+    x_u = np.expand_dims(x_u, axis=1)  # shape (n_data_points - batch_size*n_batches, 1, height, width, depth)
+    x_l_transformations = tuple(x_l_transformations)
+    return x_l, x_l_transformations, x_u

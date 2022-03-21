@@ -7,10 +7,9 @@ def gaussian_loss(dec_std=1/(2**0.5), n_data_dims=3):
     dec_std = tf.cast(dec_std, tf.float32)  # cannot take K.log of an int
 
     def loss(x_in, x_out):
-        x_in_flat = tf.reshape(x_in, (*x_in.shape[:-n_data_dims], -1))
-        x_out_flat = tf.reshape(x_out, (*x_out.shape[:-n_data_dims], -1))
-        return tf.reduce_sum(tf.square(x_in_flat - x_out_flat) / (2 * dec_std**2) +
-                             tf.math.log(dec_std) + 0.5 * tf.math.log(2 * np.pi), axis=-1)
+        return tf.reduce_sum(tf.square(x_in - x_out) / (2 * dec_std**2) +
+                             tf.math.log(dec_std) + 0.5 * tf.math.log(2 * np.pi),
+                             axis=(*range(-n_data_dims, 0),))
     return loss
 
 

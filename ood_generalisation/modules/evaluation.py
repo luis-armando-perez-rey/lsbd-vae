@@ -115,8 +115,6 @@ def plot_2d_latent_traverals_torus(lsbd, n_gridpoints, filepath, neptune_run=Non
 def ood_detection(lsbd, x_normal, x_ood, filepath, neptune_run=None):
     reconstruction_losses_normal, kl_losses_normal, elbos_normal = lsbd.compute_losses_and_elbos(x_normal)
     reconstruction_losses_ood, kl_losses_ood, elbos_ood = lsbd.compute_losses_and_elbos(x_ood)
-    elbos_normal = elbos_normal.numpy()
-    elbos_ood = elbos_ood.numpy()
 
     filepath_hist = filepath.parent / (filepath.name + "_hist.pdf")
     filepath_dens = filepath.parent / (filepath.name + "_dens.pdf")

@@ -28,11 +28,14 @@ def get_architectures(architecture: str, **kwargs):
         dense_units_lst = (64,)
         return architectures.encoder_decoder_vgglike_2d(
             filters_lst=filters_lst, dense_units_lst=dense_units_lst, **kwargs)
+    elif architecture == "dislib":
+        return architectures.encoder_decoder_dislib_2d(**kwargs)
     else:
         raise ValueError(f"{architecture} not defined")
 
 
 def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, epochs: int, batch_size: int,
+                supervision_batch_size: int,
                 architecture: str, log_t_limit: tuple = (-10, -6), neptune_run=None, correct_dsprites_symmetries=False,
                 use_angles_for_selection=True):
     # region =setup data_class and latent spaces=
@@ -91,9 +94,10 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     # endregion
 
     # region =setup (semi-)supervised train dataset=
-    n_labels = len(images_train) // 2  # fully supervised
+    n_labels = len(images_train) // supervision_batch_size  # fully supervised
     x_l, x_l_transformations, x_u = \
-        data_selection.setup_circles_dataset_labelled_pairs(images_train, factor_values_as_angles_train, n_labels)
+        data_selection.setup_circles_dataset_labelled_batches(images_train, factor_values_as_angles_train, n_labels,
+                                                              supervision_batch_size)
     print("X_l shape", x_l.shape, "num transformations", len(x_l_transformations), "x_u len", len(x_u))
     print("transformations shape:", x_l_transformations[0].shape)
     # endregion
@@ -109,7 +113,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     print("\n=== Decoder Architecture: ===")
     decoder.summary()
     print()
-    lsbdvae = LSBDVAE([encoder], decoder, latent_spaces, 2, input_shape=input_shape)
+    lsbdvae = LSBDVAE([encoder], decoder, latent_spaces, supervision_batch_size, input_shape=input_shape)
     lsbdvae.s_lsbd.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
     lsbdvae.s_lsbd.fit(x={"images": x_l, "transformations": x_l_transformations}, epochs=epochs, batch_size=batch_size,
                        callbacks=callbacks)
@@ -144,7 +148,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
 
     # density plots for training vs ood
     if images_ood is not None:
-        print("... plotting density plots")
+        print("... plotting OOD detection plots")
         evaluation.ood_detection(lsbdvae.u_lsbd, images_train, images_ood, save_path / "ood_detection", neptune_run)
     # endregion
 
@@ -196,12 +200,14 @@ if __name__ == "__main__":
     kwargs_lsbdvae_ = {
         # "data_parameters": presets.SQUARE_PARAMETERS, "use_angles_for_selection": True,
         # "data_parameters": presets.ARROW_PARAMETERS, "use_angles_for_selection": True,
+        # "factor_ranges": presets.FACTOR_RANGES_2D_9_16,
         "data_parameters": {"data": "dsprites"}, "use_angles_for_selection": False,
-        "factor_ranges": None,
+        "factor_ranges": presets.FACTOR_RANGES_DSPRITES_RTE,
         "epochs": 10,
-        "batch_size": 128,
-        "architecture": "dense",  # "dense", "conv"
-        "log_t_limit": (-10, -9),
+        "batch_size": 8,
+        "supervision_batch_size": 32,
+        "architecture": "dislib",  # "dense", "conv", "dislib"
+        "log_t_limit": (-30, -29),
         "correct_dsprites_symmetries": True,
     }
 
