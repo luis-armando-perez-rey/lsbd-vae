@@ -12,8 +12,8 @@ sys.path.append(ROOT_PATH)
 
 # local imports
 from lsbd_vae.data_utils.data_loader import load_factor_data
-from lsbd_vae.models.lsbd_vae import LSBDVAE
-from lsbd_vae.models import architectures
+from lsbd_vae.models.lsbd_vae import SupervisedLSBDVAE
+from lsbd_vae.models import architectures, reconstruction_losses
 from lsbd_vae.models.latentspace import HyperSphericalLatentSpace
 
 from ood_generalisation.modules import presets, utils, evaluation, data_selection
@@ -31,13 +31,22 @@ def get_architectures(architecture: str, **kwargs):
     elif architecture == "dislib":
         return architectures.encoder_decoder_dislib_2d(**kwargs)
     else:
-        raise ValueError(f"{architecture} not defined")
+        raise ValueError(f"{architecture} architecture not defined")
+
+
+def get_reconstruction_loss(reconstruction_loss):
+    if reconstruction_loss == "gaussian":
+        return reconstruction_losses.gaussian_loss
+    elif reconstruction_loss == "bernoulli":
+        return reconstruction_losses.bernoulli_loss
+    else:
+        raise ValueError(f"{reconstruction_loss} loss not defined")
 
 
 def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, epochs: int, batch_size: int,
-                supervision_batch_size: int,
-                architecture: str, log_t_limit: tuple = (-10, -6), neptune_run=None, correct_dsprites_symmetries=False,
-                use_angles_for_selection=True):
+                supervision_batch_size: int, architecture: str, reconstruction_loss: str,
+                log_t_limit: tuple = (-10, -6), neptune_run=None, correct_dsprites_symmetries=False,
+                use_angles_for_selection=True, early_stopping=False):
     # region =setup data_class and latent spaces=
     dataset_class = load_factor_data(root_path=ROOT_PATH, **data_parameters)
     latent_spaces = []
@@ -67,11 +76,10 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
         # flatten
         factor_values = np.reshape(factor_values_grid, (-1, 5))
         factor_values_as_angles = np.reshape(factor_values_as_angles_grid, (-1, 5))
-        # TODO: make sure that evaluation code also uses these factor values, not from the dataset_class
     else:
         if data_parameters["data"] == "dsprites":
             print("correct_dsprites_symmetries is set to True, but the data isn't dsprites, ignoring this parameter")
-        factor_values_grid = dataset_class.factor_mesh
+        # factor_values_grid = dataset_class.factor_mesh
         factor_values_as_angles_grid = dataset_class.factor_mesh_as_angles
         factor_values = dataset_class.flat_factor_mesh
         factor_values_as_angles = dataset_class.flat_factor_mesh_as_angles
@@ -80,7 +88,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
         images_train = images
         factor_values_as_angles_train = factor_values_as_angles
         images_ood = None
-        factor_values_as_angles_ood = None
+        # factor_values_as_angles_ood = None
     else:
         if use_angles_for_selection:
             indices_ood, indices_train = \
@@ -90,7 +98,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
         images_train = images[indices_train]
         factor_values_as_angles_train = factor_values_as_angles[indices_train]
         images_ood = images[indices_ood]
-        factor_values_as_angles_ood = factor_values_as_angles[indices_ood]
+        # factor_values_as_angles_ood = factor_values_as_angles[indices_ood]
     # endregion
 
     # region =setup (semi-)supervised train dataset=
@@ -102,21 +110,28 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     print("transformations shape:", x_l_transformations[0].shape)
     # endregion
 
-    # region =SETUP LSBD-VAE=
+    # region =SETUP/TRAIN/SAVE LSBD-VAE=
     callbacks = []
     if neptune_run is not None:
         neptune_callback = utils.NeptuneMonitor(neptune_run)
         callbacks.append(neptune_callback)
+    if early_stopping:
+        early_stopping_callback = tf.keras.callbacks.EarlyStopping(monitor="loss_s", min_delta=1, patience=3,
+                                                                   mode="min", restore_best_weights=True, verbose=1)
+        callbacks.append(early_stopping_callback)
     encoder, decoder = get_architectures(architecture, latent_dim=latent_dim, input_shape=input_shape)
     print("\n=== Encoder Architecture: ===")
     encoder.summary()
     print("\n=== Decoder Architecture: ===")
     decoder.summary()
     print()
-    lsbdvae = LSBDVAE([encoder], decoder, latent_spaces, supervision_batch_size, input_shape=input_shape)
-    lsbdvae.s_lsbd.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
-    lsbdvae.s_lsbd.fit(x={"images": x_l, "transformations": x_l_transformations}, epochs=epochs, batch_size=batch_size,
-                       callbacks=callbacks)
+    lsbdvae = SupervisedLSBDVAE([encoder], decoder, latent_spaces, supervision_batch_size, input_shape=input_shape,
+                                reconstruction_loss=get_reconstruction_loss(reconstruction_loss))
+    lsbdvae.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
+    lsbdvae.fit(x={"images": x_l, "transformations": x_l_transformations}, epochs=epochs, batch_size=batch_size,
+                callbacks=callbacks)
+
+    lsbdvae.save_weights(save_path / "model_weights")
     # endregion
 
     # region =EVALUATIONS=
@@ -125,31 +140,31 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     n_samples = 10
     indices = np.random.choice(len(images_train), size=n_samples, replace=False)
     x_samples = images_train[indices]
-    evaluation.plot_reconstructions(lsbdvae.u_lsbd, x_samples, save_path / "reconstructions_train", neptune_run)
+    evaluation.plot_reconstructions(lsbdvae, x_samples, save_path / "reconstructions_train", neptune_run)
     # reconstructions of ood data
     if images_ood is not None:
         indices = np.random.choice(len(images_ood), size=n_samples, replace=False)
         x_samples = images_ood[indices]
-        evaluation.plot_reconstructions(lsbdvae.u_lsbd, x_samples, save_path / "reconstructions_ood", neptune_run)
+        evaluation.plot_reconstructions(lsbdvae, x_samples, save_path / "reconstructions_ood", neptune_run)
 
     # torus embeddings & latent traversals (in 2d grid for 2 factors)
     print("... plotting torus embeddings & latent traversals")
     for i in range(dataset_class.n_factors-1):
         for j in range(i+1, dataset_class.n_factors):
-            evaluation.plot_2d_latent_traverals_torus(lsbdvae.u_lsbd, 10, save_path / f"2d_traversals_torus_{i}_{j}",
+            evaluation.plot_2d_latent_traverals_torus(lsbdvae, 10, save_path / f"2d_traversals_torus_{i}_{j}",
                                                       neptune_run, x_dim=i, y_dim=j)
-            evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_as_angles_grid, lsbdvae.u_lsbd,
+            evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_as_angles_grid, lsbdvae,
                                                save_path / f"2d_embedding_{i}_{j}", neptune_run, x_dim=i, y_dim=j)
 
     # circle embeddings, one for each latent space
     print("... plotting circle embeddings")
-    evaluation.plot_circle_embeddings(images, factor_values_as_angles, lsbdvae.u_lsbd, save_path / "circle_embeddings",
+    evaluation.plot_circle_embeddings(images, factor_values_as_angles, lsbdvae, save_path / "circle_embeddings",
                                       neptune_run)
 
     # density plots for training vs ood
     if images_ood is not None:
         print("... plotting OOD detection plots")
-        evaluation.ood_detection(lsbdvae.u_lsbd, images_train, images_ood, save_path / "ood_detection", neptune_run)
+        evaluation.ood_detection(lsbdvae, images_train, images_ood, save_path / "ood_detection", neptune_run)
     # endregion
 
 
@@ -194,21 +209,27 @@ def main(kwargs_lsbdvae):
     end_time = time.time()
     utils.print_and_log_time(start_time, end_time, neptune_run_, "time_elapsed/train")
     print()
+    if neptune_run_ is not None:
+        neptune_run_.stop()
 
 
 if __name__ == "__main__":
     kwargs_lsbdvae_ = {
         # "data_parameters": presets.SQUARE_PARAMETERS, "use_angles_for_selection": True,
-        # "data_parameters": presets.ARROW_PARAMETERS, "use_angles_for_selection": True,
-        # "factor_ranges": presets.FACTOR_RANGES_2D_9_16,
-        "data_parameters": {"data": "dsprites"}, "use_angles_for_selection": False,
-        "factor_ranges": presets.FACTOR_RANGES_DSPRITES_RTE,
-        "epochs": 10,
+        "data_parameters": presets.ARROW_PARAMETERS, "use_angles_for_selection": True,
+        "factor_ranges": presets.FACTOR_RANGES_2D_9_16,
+        # "data_parameters": {"data": "dsprites"}, "use_angles_for_selection": False,
+        # "factor_ranges": presets.FACTOR_RANGES_DSPRITES_RTE,
+        # "data_parameters": {"data": "shapes3d"}, "use_angles_for_selection": False,
+        # "factor_ranges": presets.FACTOR_RANGES_SHAPES3D_EXTR,
+        "epochs": 50,
         "batch_size": 8,
         "supervision_batch_size": 32,
         "architecture": "dislib",  # "dense", "conv", "dislib"
-        "log_t_limit": (-30, -29),
+        "reconstruction_loss": "bernoulli",  # "gaussian", "bernoulli"
+        "log_t_limit": (-10, -6),
         "correct_dsprites_symmetries": True,
+        "early_stopping": True,
     }
 
     main(kwargs_lsbdvae_)

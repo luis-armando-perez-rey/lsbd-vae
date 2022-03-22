@@ -36,3 +36,15 @@ FACTOR_RANGES_DSPRITES_EXTR_016 = ((0.0, 3.0), (0.0, 1.1), (0.0, 2*np.pi), (0.16
 FACTOR_RANGES_DSPRITES_EXTR_025 = ((0.0, 3.0), (0.0, 1.1), (0.0, 2*np.pi), (0.25, 1.1), (0.0, 1.1))
 FACTOR_RANGES_DSPRITES_EXTR_050 = ((0.0, 3.0), (0.0, 1.1), (0.0, 2*np.pi), (0.50, 1.1), (0.0, 1.1))
 FACTOR_RANGES_DSPRITES_EXTR_075 = ((0.0, 3.0), (0.0, 1.1), (0.0, 2*np.pi), (0.75, 1.1), (0.0, 1.1))
+
+# for shapes3d, which has factor shape (10, 10, 10, 8, 4, 15),
+#   factors ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
+# 0. floor_hue: 10 values from 0 to 0.9 (basically cyclic, first is red, last is purple)
+# 1. wall_hue: 10 values from 0 to 0.9 (basically cyclic, first is red, last is purple)
+# 2. object_hue: 10 values from 0 to 0.9 (basically cyclic, first is red, last is purple)
+# 3. scale: 8 values from  0 to 1
+# 4. shape: 4 values from 0 to 3, 0=cube, 1=cylinder, 2=ball, 3=oblong
+# 5. orientation: 15 values from 0 to 1
+FACTOR_RANGES_SHAPES3D_RTE = ((0.5, 1.0), (0.5, 1.0), (0.5, 1.0), (1.0, 1.1), (3.0, 3.1), (0.0, 0.01))
+FACTOR_RANGES_SHAPES3D_RTR = ((0.0, 1.0), (0.0, 1.0), (0.5, 1.0), (0.0, 1.1), (3.0, 3.1), (0.0, 1.1))
+FACTOR_RANGES_SHAPES3D_EXTR = ((0.5, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.1), (0.0, 3.1), (0.0, 1.1))

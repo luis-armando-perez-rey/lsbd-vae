@@ -16,6 +16,7 @@ def load_factor_data(data, root_path=None, **kwargs) -> Type[FactorImageDataset]
     options_dict = {
         "sim_toy": get_sim_toy,
         "dsprites": get_dsprites,
+        "shapes3d": get_shapes3d,
         "modelnet_colors": get_modelnet_colors,
         "pixel": get_transformed_pixel,
         "arrow": get_transformed_arrow,
@@ -42,16 +43,11 @@ def get_sim_toy(root_path):
 
 def get_dsprites(root_path, noncyclic_gap=0.1):
     """
-
     Args:
         root_path: path where the data folder is
-        correct_rotational_symmetries: if True, angles for squares are multiplied by 4, and for ellipses by 2
         noncyclic_gap: for assigning angular values to the factor values, this represents the percentage of a circle
             that will not have any factor values assigned to it, for factors that are not cyclic. E.g. if factor values
             are from 0 to 0.9, and the noncyclic_gap is 0.1, the max_factor_value will be 1.
-
-    Returns:
-
     """
     assert root_path is not None, "project root path is not supplied"
     dsprites_path = os.path.join(root_path, "data", "dsprites", "dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz")
@@ -73,6 +69,49 @@ def get_dsprites(root_path, noncyclic_gap=0.1):
         1 / (1 - noncyclic_gap),
         2 * np.pi,
         1 / (1 - noncyclic_gap),
+        1 / (1 - noncyclic_gap)
+    ]
+    return FactorImageDataset(images, max_factor_values=max_factor_values, factor_names=factor_names,
+                              factor_values_list=factor_values_list)
+
+
+def get_shapes3d(root_path, noncyclic_gap=0.1):
+    """
+    Args:
+        root_path: path where the data folder is
+        noncyclic_gap: for assigning angular values to the factor values, this represents the percentage of a circle
+            that will not have any factor values assigned to it, for factors that are not cyclic. E.g. if factor values
+            are from 0 to 0.9, and the noncyclic_gap is 0.1, the max_factor_value will be 1.
+    """
+    assert root_path is not None, "project root path is not supplied"
+    shapes3d_path = os.path.join(root_path, "data", "shapes3d", "3dshapes.h5")
+    dataset = h5py.File(shapes3d_path, 'r')
+    images = dataset['images'][()]  # numpy array shape [480000,64,64,3], uint8 in range(256)
+    # labels = dataset['labels'][()]  # numpy array shape [480000,6], float64
+
+    images = images.reshape((10, 10, 10, 8, 4, 15, 64, 64, 3)).astype("float32") / 255
+
+    factor_names = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
+    # 0. floor_hue: 10 values from 0 to 0.9 (basically cyclic, first is red, last is purple)
+    # 1. wall_hue: 10 values from 0 to 0.9 (basically cyclic, first is red, last is purple)
+    # 2. object_hue: 10 values from 0 to 0.9 (basically cyclic, first is red, last is purple)
+    # 3. scale: 8 values from 0.75 to 1.25, instead use values from 0 to 1
+    # 4. shape: 4 values from 0 to 3, 0=cube, 1=cylinder, 2=ball, 3=oblong
+    # 5. orientation: 15 values from -30 to 30, instead use values from 0 to 1
+    factor_values_list = [
+        np.linspace(0, 0.9, num=10),
+        np.linspace(0, 0.9, num=10),
+        np.linspace(0, 0.9, num=10),
+        np.linspace(0, 1, num=8),
+        np.linspace(0, 3, num=4),
+        np.linspace(0, 1, num=15),
+    ]
+    max_factor_values = [
+        1,
+        1,
+        1,
+        1 / (1 - noncyclic_gap),
+        4,
         1 / (1 - noncyclic_gap)
     ]
     return FactorImageDataset(images, max_factor_values=max_factor_values, factor_names=factor_names,

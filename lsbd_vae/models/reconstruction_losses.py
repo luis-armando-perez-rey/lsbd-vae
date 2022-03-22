@@ -15,8 +15,10 @@ def gaussian_loss(dec_std=1/(2**0.5), n_data_dims=3):
 
 def bernoulli_loss(n_data_dims=3):
     def loss(x_in, x_out):
-        data_dim = tf.reduce_prod(tf.cast(x_in.shape[-n_data_dims:], tf.float32))
-        x_in_flat = tf.reshape(x_in, (*x_in.shape[:-n_data_dims], data_dim))
-        x_out_flat = tf.reshape(x_out, (*x_out.shape[:-n_data_dims], data_dim))
-        return data_dim * binary_crossentropy(x_in_flat, x_out_flat)
+        # BCE computes a mean over the final dimension, but we want a sum over all data_dims instead,
+        # so we fix this by multiplying with the size of the final dimension. Furthermore, BCE reduces the final dim,
+        # so we only need to reduce_sum over the last n_data_dims-1 dimensions.
+        image_depth = x_in.shape[-1]
+        return tf.reduce_sum(binary_crossentropy(x_in, x_out) * image_depth,
+                             axis=(*range(-n_data_dims+1, 0),))
     return loss

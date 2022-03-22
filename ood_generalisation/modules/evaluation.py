@@ -126,6 +126,7 @@ def ood_detection(lsbd, x_normal, x_ood, filepath, neptune_run=None):
     auroc, auprc = plotting.roc_pr_curves(elbos_normal, elbos_ood, filepath_roc=filepath_roc, filepath_pr=filepath_pr,
                                           neptune_run=neptune_run, return_fp_fn=False)
 
+    # TODO: also save auroc and auprc locally
     if neptune_run is not None:
         neptune_run[f"ood_scores/{filepath.name}_auroc"] = auroc
         neptune_run[f"ood_scores/{filepath.name}_auprc"] = auprc

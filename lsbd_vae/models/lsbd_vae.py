@@ -264,18 +264,6 @@ class BaseLSBDVAE(tf.keras.Model):
     def compute_losses_and_elbos(self, input_images: np.array):
         return self.loss_model.predict(input_images)
 
-    # TODO: remove if above works
-    def compute_losses_and_elbos_old(self, input_images: np.array):
-        input_images = tf.cast(input_images, tf.float32)  # cast to float32 to avoid mismatch when computing reconstr.
-        encodings_list, scale_list = self.encode_images_loc_scale(input_images)
-        reconstructions = self.decode_latents(encodings_list)
-
-        reconstruction_losses = self.reconstruction_loss(input_images, reconstructions)  # shape (n_images)
-        kl_losses = self.kl_loss_function(encodings_list, scale_list, use_kl_weight=False)  # shape (n_images)
-        elbos = - reconstruction_losses - kl_losses
-
-        return reconstruction_losses, kl_losses, elbos
-
 
 class UnsupervisedLSBDVAE(BaseLSBDVAE):
 
