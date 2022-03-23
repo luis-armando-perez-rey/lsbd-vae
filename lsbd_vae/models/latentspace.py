@@ -146,7 +146,7 @@ class GaussianLatentSpace(LatentSpace):
         return np.random.normal(size=batch_shape + (self.dim,), loc=0, scale=1)
 
     def average(self, z):
-        n_transformations = int(z.shape[-2])  # z has shape (*batch_dims, n_transformed_datapoints, latent_dim)
+        n_transformations = int(z.shape[-2])  # z has shape (*batch_dims, n_transformations, latent_dim)
         z_sum = K.sum(z, axis=-2, keepdims=True)
         z_avg = z_sum / n_transformations
         z_avg = K.repeat_elements(z_avg, n_transformations, axis=-2)

@@ -40,6 +40,10 @@ class PathsTransformationsLabels:
         self._paths = tf.concat(values, axis=0)
 
     @property
+    def flat_paths(self):
+        return tf.reshape(self.paths, tf.reduce_prod(self.paths.shape))
+
+    @property
     def transformations(self):
         return self._transformations
 
@@ -101,7 +105,7 @@ class PathsTransformationsLabels:
                         [tf.reshape(transformation, (batch_size * paths_per_group,)) for transformation in
                          transformations])
                 output.update({"transformations": transformations})
-            return output, None  # output tuple since Tensorflow is accostumed to be fit with x,y data
+            return output  # output tuple since Tensorflow is accostumed to be fit with x,y data
 
         return image_load
 
@@ -174,6 +178,10 @@ class FactorCombinations(PathsTransformationsLabels):
         transformations = None
         super(FactorCombinations, self).__init__([paths], transformations, labels, image_shape)
 
+    @property
+    def factor_index_meshgrid(self):
+        return tf.meshgrid(*self.factor_indexes, indexing="ij")
+
     def __gather_factor_string_meshgrid(self, factor_index_meshgrid):
         factor_string_meshgrid = []
         for num_factor in range(self.num_factors):
@@ -188,8 +196,8 @@ class FactorCombinations(PathsTransformationsLabels):
         :return:
         """
         # Make list of states with factor values per factor
-        factor_index_meshgrid = tf.meshgrid(*self.factor_indexes, indexing="ij")
-        factor_string_meshgrid = self.__gather_factor_string_meshgrid(factor_index_meshgrid)
+
+        factor_string_meshgrid = self.__gather_factor_string_meshgrid(self.factor_index_meshgrid)
         filenames = tf.strings.join(factor_string_meshgrid, separator="_")
         # Join states to image extension
         filenames = tf.strings.join([filenames, ".png"], separator="")
@@ -209,6 +217,13 @@ class FactorCombinations(PathsTransformationsLabels):
             labels = self.labeling_function(paths)
         return labels
 
+    def __get_factor_indexes(self, flat_paths) -> Optional[List]:
+
+        for num_factor, factor_values in enumerate(self.factor_values_list):
+            filename = os.path.basename(flat_paths)
+            factor_value = filename.split("_")[num_factor]
+            factor_index = factor_values.index(factor_value)
+
     def __get_image_load_function_flat_paths(self, get_labels: bool = False):
         """
         Create function to apply to tf.data.Dataset data
@@ -224,7 +239,7 @@ class FactorCombinations(PathsTransformationsLabels):
                 output = {"images": images, "labels": labels}
             else:
                 output = {"images": images}
-            return output, None  # output tuple since Tensorflow is accostumed to be fit with x,y data
+            return output  # output tuple since Tensorflow is accostumed to be fit with x,y data
 
         return image_load
 
@@ -258,6 +273,7 @@ class FactorCombinations(PathsTransformationsLabels):
                 "Warning: Shuffle is not zero and data cannot be reorganized as (n_identities, factor1, factor2, ..."
                 " factorN, *image_shape) after complete load. If this is intended then disregard this message")
             ds = ds.shuffle(shuffle)
+
         return ds
 
 
@@ -271,7 +287,7 @@ class RandomWalkFactor(PathsTransformationsLabels):
     def __init__(self, source_path: str, factor_values_list: List, num_random_walks: int,
                  step_sizes: np.array,
                  random_walk_length: int, bool_change_factors: List[bool], image_shape: Tuple[int, int, int],
-                 extension: str = ".png", labeling_function: Optional[Callable] = None, seed: Optional[int] = None):
+                 extension: str = ".png", labeling_function: Optional[Callable] = None, seed: Optional[int] = None, fixed_direction:bool = False):
         """
         Initialize class
         :param source_path: path were images are stored
@@ -291,6 +307,7 @@ class RandomWalkFactor(PathsTransformationsLabels):
         self.num_factors = len(factor_values_list)
 
         # Random walk variables
+        self.fixed_direction = fixed_direction
         self.num_random_walks = num_random_walks
         self.max_factor_indexes = np.array([len(factor) for factor in factor_values_list]).astype(np.int32)
         self.random_walk_length = random_walk_length
@@ -332,7 +349,11 @@ class RandomWalkFactor(PathsTransformationsLabels):
         Returns random +/- sign for factors that change
         :return:
         """
-        sign = tf.random.uniform((self.num_random_walks, self.random_walk_length - 1), maxval=2, dtype=tf.int32)
+        if self.fixed_direction:
+            sign = tf.random.uniform((self.num_random_walks,), maxval=2, dtype=tf.int32)
+            sign = tf.stack([sign]*(self.random_walk_length - 1), axis = -1)
+        else:
+            sign = tf.random.uniform((self.num_random_walks, self.random_walk_length - 1), maxval=2, dtype=tf.int32)
         sign = tf.expand_dims(tf.where(sign == 0, x=tf.ones_like(sign), y=-tf.ones_like(sign)), axis=-1)
         return sign
 
@@ -434,7 +455,8 @@ class RandomWalkIdentities(RandomWalkFactor):
     def __init__(self, source_path: str, factor_values_list: List, num_random_walks_per_identity: int,
                  step_sizes: np.array,
                  random_walk_length: int, bool_change_factors: List[bool], image_shape: Tuple[int, int, int],
-                 extension: str = ".png", labeling_function: Optional[Callable] = None, seed: Optional[int] = None):
+                 extension: str = ".png", labeling_function: Optional[Callable] = None, seed: Optional[int] = None,
+                 fixed_direction: bool = False):
         self.bool_fixed_factors = [not change_factor for change_factor in bool_change_factors]
         self.fixed_indexes_meshgrid = self.__get_fixed_indexes_mesh_grid(factor_values_list,
                                                                          num_random_walks_per_identity)
@@ -443,7 +465,7 @@ class RandomWalkIdentities(RandomWalkFactor):
         super(RandomWalkIdentities, self).__init__(source_path, factor_values_list,
                                                    total_random_walks, step_sizes,
                                                    random_walk_length, bool_change_factors, image_shape,
-                                                   extension, labeling_function, seed)
+                                                   extension, labeling_function, seed, fixed_direction)
 
     def __get_fixed_indexes_mesh_grid(self, factor_values_list: List, num_identity_repetitions: int) -> np.array:
         """
