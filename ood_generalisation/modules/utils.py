@@ -14,6 +14,17 @@ def print_and_log_time(start, end, neptune_run=None, neptune_log_name=None):
         neptune_run[neptune_log_name + "/seconds"] = seconds
 
 
+def file_exists(filepath, extension=None, overwrite=False):
+    if overwrite:
+        return False
+    else:
+        if extension is not None:
+            filepath = filepath.parent / (filepath.name + extension)
+        if filepath.is_file():
+            print(f"File {filepath} already exists, skipping. Set overwrite=True to overwrite.")
+        return filepath.is_file()
+
+
 class NeptuneMonitor(tf.keras.callbacks.Callback):
     def __init__(self, neptune_run):
         super().__init__()

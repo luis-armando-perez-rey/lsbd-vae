@@ -1,0 +1,5 @@
+#!/bin/bash
+source /home/TUE/s071171/miniconda3/etc/profile.d/conda.sh
+conda activate lsbdvae2
+python reevaluate_ood.py
+conda deactivate

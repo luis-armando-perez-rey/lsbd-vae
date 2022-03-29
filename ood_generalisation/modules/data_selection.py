@@ -146,3 +146,59 @@ def setup_circles_dataset_labelled_batches(images, factor_values, n_batches, bat
     x_u = np.expand_dims(x_u, axis=1)  # shape (n_data_points - batch_size*n_batches, 1, height, width, depth)
     x_l_transformations = tuple(x_l_transformations)
     return x_l, x_l_transformations, x_u
+
+
+def dsprites_symmetry_correction(dataset_class):
+    factor_values_grid = dataset_class.factor_mesh
+    factor_values_as_angles_grid = dataset_class.factor_mesh_as_angles
+    # factor0 is shape: 0=square, 1=ellips, 2=heart. factor2 is orientation (axis5 contains factor values)
+    # project angles for square onto 90 degrees, then rescale back to 360 degrees
+    factor_values_grid[0, :, :, :, :, 2] = np.mod(factor_values_grid[0, :, :, :, :, 2], 0.5 * np.pi) * 4
+    factor_values_as_angles_grid[0, :, :, :, :, 2] = \
+        np.mod(factor_values_as_angles_grid[0, :, :, :, :, 2], 0.5 * np.pi) * 4
+    # project angles for ellips onto 180 degrees, then rescale back to 360 degrees
+    factor_values_grid[1, :, :, :, :, 2] = np.mod(factor_values_grid[1, :, :, :, :, 2], np.pi) * 2
+    factor_values_as_angles_grid[1, :, :, :, :, 2] = \
+        np.mod(factor_values_as_angles_grid[1, :, :, :, :, 2], np.pi) * 2
+    # flatten
+    factor_values = np.reshape(factor_values_grid, (-1, 5))
+    factor_values_as_angles = np.reshape(factor_values_as_angles_grid, (-1, 5))
+    return factor_values_as_angles_grid, factor_values, factor_values_as_angles
+
+
+def split_up_data_ood(dataset_class, data_parameters, correct_dsprites_symmetries, use_angles_for_selection,
+                      factor_ranges):
+    images = dataset_class.flat_images
+
+    # regular factor values are needed to select factor combinations given factor_ranges,
+    # factor values as angles are needed for LSBD-VAE training
+    if correct_dsprites_symmetries and data_parameters["data"] == "dsprites":
+        factor_values_as_angles_grid, factor_values, factor_values_as_angles = \
+            dsprites_symmetry_correction(dataset_class)
+    else:
+        if data_parameters["data"] == "dsprites":
+            print("correct_dsprites_symmetries is set to True, but the data isn't dsprites, ignoring this parameter")
+        # factor_values_grid = dataset_class.factor_mesh
+        factor_values_as_angles_grid = dataset_class.factor_mesh_as_angles
+        factor_values = dataset_class.flat_factor_mesh
+        factor_values_as_angles = dataset_class.flat_factor_mesh_as_angles
+
+    if factor_ranges is None:
+        images_train = images
+        factor_values_as_angles_train = factor_values_as_angles
+        images_ood = None
+        factor_values_as_angles_ood = None
+    else:
+        if use_angles_for_selection:
+            indices_ood, indices_train = \
+                select_factor_combinations(factor_values_as_angles, factor_ranges)
+        else:
+            indices_ood, indices_train = select_factor_combinations(factor_values, factor_ranges)
+        images_train = images[indices_train]
+        factor_values_as_angles_train = factor_values_as_angles[indices_train]
+        images_ood = images[indices_ood]
+        factor_values_as_angles_ood = factor_values_as_angles[indices_ood]
+
+    return images, images_train, images_ood,\
+        factor_values_as_angles, factor_values_as_angles_train, factor_values_as_angles_ood,\
+        factor_values_as_angles_grid

@@ -4,8 +4,7 @@ from PIL import Image
 import h5py
 import json
 import tensorflow as tf
-import tensorflow_datasets as tfds
-from skimage.transform import resize
+
 from typing import Type
 
 from lsbd_vae.data_utils.factor_dataset import FactorImageDataset
@@ -319,6 +318,7 @@ def get_h5_saved_data(root_path, collection_list, data_type, dataset_directory, 
 
 
 def get_coil100(root_path, rescale_size=64):
+    import tensorflow_datasets as tfds
     # load dataset from tfds
     data_path = os.path.join(root_path, "data", "tfds_coil100")
     ds = tfds.load(
@@ -357,6 +357,8 @@ def get_coil100(root_path, rescale_size=64):
 
 
 def get_smallnorb(root_path, angles_only=True, rescale_size=64):
+    import tensorflow_datasets as tfds
+    from skimage.transform import resize
     # load dataset from tfds
     data_path = os.path.join(root_path, "data", "tfds_smallnorb")
     ds_np = tfds.as_numpy(tfds.load(

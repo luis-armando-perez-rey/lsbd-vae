@@ -5,20 +5,23 @@ import json
 from ood_generalisation.modules import plotting
 
 
-def plot_reconstructions(lsbd, x, filepath, neptune_run=None):
+def plot_reconstructions(encoder, decoder, x, filepath, neptune_run=None):
     """
     Args:
-        lsbd: (un)supervised LSBDVAE class instance
+        encoder: tf.keras encoder model with one output (the mean)
+        decoder: tf.keras decoder model
         x: input images array, shape (n_samples, *input_shape)
         filepath: Path object with filepath (excluding extension) where to save image.
         neptune_run: Neptune.ai run
     """
     filepath = filepath.parent / (filepath.name + ".png")
-    x_recon = lsbd.reconstruct_images(x, return_latents=False)
+    x_enc = encoder.predict(x)
+    x_recon = decoder.predict(x_enc)
     x_array = np.stack([x, x_recon], axis=0)
     plotting.plot_images_grid(x_array, filepath=filepath, neptune_run=neptune_run)
 
 
+## TODO: this is for LSBD-VAE, adapt (1D traversals?) or remove
 def plot_circle_embeddings(images, factor_values_as_angles, lsbd, filepath, neptune_run=None, n_samples=500):
     """
     F = number of factors (and number of latent spaces)
@@ -41,24 +44,28 @@ def plot_circle_embeddings(images, factor_values_as_angles, lsbd, filepath, nept
         plotting.plot_circle_embedding(encodings_list[factor], colors, filepath_factor, neptune_run)
 
 
-def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, filepath, neptune_run=None, x_dim=0, y_dim=1):
+def plot_2d_embedding(images_grid, factor_values_as_angles_grid, encoder, filepath, neptune_run=None,
+                      x_dim_f=0, y_dim_f=1, x_dim_l=0, y_dim_l=1):
     """
     F = number of factors (and number of latent spaces)
+    This makes most sense for datasets with 2 factors (and ideally 2 latent variables)
 
     Args:
         images_grid: shape (n1, ..., nF, h, w, d)
         factor_values_as_angles_grid:  shape (n1, ..., nF, F), given as angles
-        lsbd: BaseLSBDVAE instance or subclass
+        encoder: tf.keras encoder model with one output (the mean)
         filepath:
         neptune_run:
-        x_dim: value in [0, F), distinct from y_dim
-        y_dim: value in [0, F), distinct from x_dim
+        x_dim_f: value in [0, F), distinct from y_dim_f
+        y_dim_f: value in [0, F), distinct from x_dim_f
+        x_dim_l: value in [0, latent_dim), distinct from y_dim_l
+        y_dim_l: value in [0, latent_dim), distinct from x_dim_l
     """
-    assert x_dim != y_dim, "first and second dimensions should not be the same"
-    assert x_dim < lsbd.n_latent_spaces and y_dim < lsbd.n_latent_spaces
+    assert x_dim_f != y_dim_f, "first and second factor dimensions should not be the same"
+    assert x_dim_l != y_dim_l, "first and second latent dimensions should not be the same"
 
     for factor, factor_size in enumerate(factor_values_as_angles_grid.shape[:-1]):
-        if factor != x_dim and factor != y_dim:
+        if factor != x_dim_f and factor != y_dim_f:
             random_factor_index = np.random.randint(factor_size)
             # take single element for this factor index, [] brackets ensure that dimension is kept (with size 1)
             images_grid = np.take(images_grid, [random_factor_index], axis=factor)  # size of dim factor is changed to 1
@@ -66,57 +73,48 @@ def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, fil
     flat_images = np.reshape(images_grid, (-1, *images_grid.shape[-3:]))
     flat_factor_mesh = np.reshape(factor_values_as_angles_grid, (-1, factor_values_as_angles_grid.shape[-1]))
 
-    encodings_list = lsbd.encode_images(flat_images)
+    encodings = encoder.predict(flat_images)  # shape (n_datapoints, latent_dim)
     # encoded list is a list of length n_latent_spaces, each item is an array of shape (n, ls_latent_dim)
 
-    v_angle = flat_factor_mesh[:, x_dim]
-    h_angle = flat_factor_mesh[:, y_dim]
+    v_angle = flat_factor_mesh[:, x_dim_f]
+    h_angle = flat_factor_mesh[:, y_dim_f]
     colors = plotting.yiq_embedding(v_angle, h_angle)
 
-    encoded_horizontal_angle = np.arctan2(encodings_list[x_dim][:, 0], encodings_list[x_dim][:, 1])
-    encoded_vertical_angle = np.arctan2(encodings_list[y_dim][:, 0], encodings_list[y_dim][:, 1])
+    encoded_horizontal_angle = encodings[:, x_dim_l]
+    encoded_vertical_angle = encodings[:, y_dim_l]
     plotting.plot_torus_angles(encoded_horizontal_angle, encoded_vertical_angle, colors,
                                filepath=filepath, neptune_run=neptune_run)
 
 
-def plot_2d_latent_traverals_torus(lsbd, n_gridpoints, filepath, neptune_run=None, x_dim=0, y_dim=1):
+def plot_2d_latent_traverals(decoder, latent_dim, n_gridpoints, filepath, neptune_run=None,
+                             x_dim=0, y_dim=1, minval=-3, maxval=3):
     assert x_dim != y_dim, "first and second dimensions should not be the same"
-    assert x_dim < lsbd.n_latent_spaces and y_dim < lsbd.n_latent_spaces
-    # linear spaces from 0 to 2*pi (exclusive)
-    angles_x = np.linspace(0, 2 * np.pi, num=n_gridpoints, endpoint=False)
-    angles_y = np.linspace(0, 2 * np.pi, num=n_gridpoints, endpoint=False)
-    # transform to (n_gridpoints, 2) arrays of corresponding values on the unit circle
-    grid_x = np.stack([np.cos(angles_x), np.sin(angles_x)], axis=1)
-    grid_y = np.stack([np.cos(angles_y), np.sin(angles_y)], axis=1)
-    grid_x = np.expand_dims(grid_x, axis=0)  # shape (1, n_gridpoints, 2)
-    grid_y = np.expand_dims(grid_y, axis=1)  # shape (n_gridpoints, 1, 2)
-    grid_x = np.tile(grid_x, (n_gridpoints, 1, 1))  # shape (n_gridpoints, n_gridpoints, 2)
-    grid_y = np.tile(grid_y, (1, n_gridpoints, 1))  # shape (n_gridpoints, n_gridpoints, 2)
-    grid_x_flat = np.reshape(grid_x, (n_gridpoints * n_gridpoints, 2))
-    grid_y_flat = np.reshape(grid_y, (n_gridpoints * n_gridpoints, 2))
-    grid_flat = []
-    for i in range(lsbd.n_latent_spaces):
+    # make linear spaces from minval to maxval (inclusive)
+    grid_x = np.linspace(minval, maxval, num=n_gridpoints, endpoint=True)
+    grid_y = np.linspace(minval, maxval, num=n_gridpoints, endpoint=True)
+    # make list of 2 mesh grids, each has shape (n_gridpoints, n_gridpoints), values varying over axis0 and axis1 resp.
+    mesh_x, mesh_y = np.meshgrid(grid_x, grid_y, indexing="ij")
+    # make mesh grid of shape (n_gridpoints, n_gridpoints, latent_dim) with fixed random values for non-grid latent dims
+    grid = np.empty((n_gridpoints, n_gridpoints, latent_dim))
+    for i in range(latent_dim):
         if i == x_dim:
-            grid_flat.append(grid_x_flat)
+            grid[:, :, i] = mesh_x
         elif i == y_dim:
-            grid_flat.append(grid_y_flat)
-        else:  # fix random value for entire grid
-            angle = np.random.uniform(0, 2*np.pi)
-            circlepoint = np.array([np.cos(angle), np.sin(angle)])
-            circlepoint = np.expand_dims(circlepoint, axis=0)  # shape (1, 2)
-            circlepoint = np.tile(circlepoint, (n_gridpoints * n_gridpoints, 1))  # shape (n_gridpoints**2, 2)
-            grid_flat.append(circlepoint)
-    #grid_flat = [grid_x_flat, grid_y_flat]
+            grid[:, :, i] = mesh_y
+        else:
+            grid[:, :, i] = np.random.normal()
+    grid_flat = np.reshape(grid, (n_gridpoints * n_gridpoints, latent_dim))
+
     # decode
-    x_generated = lsbd.decode_latents(grid_flat)  # shape (n_gridpoints*n_gridpoints, *input_dim)
+    x_generated = decoder.predict(grid_flat)  # shape (n_gridpoints*n_gridpoints, *input_dim)
     x_generated = np.reshape(x_generated, (n_gridpoints, n_gridpoints, *x_generated.shape[1:]))
     # plot output
     plotting.plot_images_grid(x_generated, filepath=filepath, neptune_run=neptune_run)
 
 
-def ood_detection(lsbd, x_normal, x_ood, filepath, neptune_run=None):
-    reconstruction_losses_normal, kl_losses_normal, elbos_normal = lsbd.compute_losses_and_elbos(x_normal)
-    reconstruction_losses_ood, kl_losses_ood, elbos_ood = lsbd.compute_losses_and_elbos(x_ood)
+def ood_detection(loss_model, x_normal, x_ood, filepath, neptune_run=None):
+    reconstruction_losses_normal, kl_losses_normal, elbos_normal = loss_model.predict(x_normal)
+    reconstruction_losses_ood, kl_losses_ood, elbos_ood = loss_model.predict(x_ood)
 
     filepath_hist = filepath.parent / (filepath.name + "_hist.pdf")
     filepath_dens = filepath.parent / (filepath.name + "_dens.pdf")

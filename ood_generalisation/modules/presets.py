@@ -48,3 +48,42 @@ FACTOR_RANGES_DSPRITES_EXTR_075 = ((0.0, 3.0), (0.0, 1.1), (0.0, 2*np.pi), (0.75
 FACTOR_RANGES_SHAPES3D_RTE = ((0.5, 1.0), (0.5, 1.0), (0.5, 1.0), (1.0, 1.1), (3.0, 3.1), (0.0, 0.01))
 FACTOR_RANGES_SHAPES3D_RTR = ((0.0, 1.0), (0.0, 1.0), (0.5, 1.0), (0.0, 1.1), (3.0, 3.1), (0.0, 1.1))
 FACTOR_RANGES_SHAPES3D_EXTR = ((0.5, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.1), (0.0, 3.1), (0.0, 1.1))
+
+# load data_paramaters, factor ranges, and use_angles_for_selection given a single name (as used in dislib)
+DATA_RANGES_ANGLES = {
+    "arrow": (ARROW_PARAMETERS, None, True),
+    "square": (SQUARE_PARAMETERS, None, True),
+    "dsprites_lsbd": ({"data": "dsprites"}, None, False),
+    "shapes3d_lsbd": ({"data": "shapes3d"}, None, False),
+    "arrow_1_16": (ARROW_PARAMETERS, FACTOR_RANGES_2D_1_16, True),
+    "arrow_quadrant": (ARROW_PARAMETERS, FACTOR_RANGES_2D_QUADRANT, True),
+    "arrow_9_16": (ARROW_PARAMETERS, FACTOR_RANGES_2D_9_16, True),
+    "square_1_16": (SQUARE_PARAMETERS, FACTOR_RANGES_2D_1_16, True),
+    "square_quadrant": (SQUARE_PARAMETERS, FACTOR_RANGES_2D_QUADRANT, True),
+    "square_9_16": (SQUARE_PARAMETERS, FACTOR_RANGES_2D_9_16, True),
+    "dsprites_rte": ({"data": "dsprites"}, FACTOR_RANGES_DSPRITES_RTE, False),
+    "dsprites_rtr": ({"data": "dsprites"}, FACTOR_RANGES_DSPRITES_RTR_POSX, False),
+    "dsprites_extr": ({"data": "dsprites"}, FACTOR_RANGES_DSPRITES_EXTR_050, False),
+    "shapes3d_rte": ({"data": "shapes3d"}, FACTOR_RANGES_SHAPES3D_RTE, False),
+    "shapes3d_rtr": ({"data": "shapes3d"}, FACTOR_RANGES_SHAPES3D_RTR, False),
+    "shapes3d_extr": ({"data": "shapes3d"}, FACTOR_RANGES_SHAPES3D_EXTR, False),
+}
+
+DATASET_INTERESTING_LATENT_DIMS = {
+    "arrow": (0, 1),
+    "square": (0, 1),
+    "dsprites_lsbd": (3, 4),
+    "shapes3d_lsbd": (0, 1),
+    "arrow_1_16": (0, 1),
+    "arrow_quadrant": (0, 1),
+    "arrow_9_16": (0, 1),
+    "square_1_16": (0, 1),
+    "square_quadrant": (0, 1),
+    "square_9_16": (0, 1),
+    "dsprites_rte": (3, 4),
+    "dsprites_rtr": (0, 3),
+    "dsprites_extr": (3, 4),
+    "shapes3d_rte": (0, 1),
+    "shapes3d_rtr": (2, 4),
+    "shapes3d_extr": (0, 1),
+}
