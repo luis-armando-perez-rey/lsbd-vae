@@ -20,6 +20,6 @@ def bernoulli_loss(n_data_dims=3):
         # so we fix this by multiplying with the size of the final dimension. Furthermore, BCE reduces the final dim,
         # so we only need to reduce_sum over the last n_data_dims-1 dimensions.
         image_depth = x_in.shape[-1]
-        return tf.reduce_sum(binary_crossentropy(x_in, x_out) * image_depth,
+        return tf.reduce_sum(binary_crossentropy(x_in, x_out, from_logits=True) * image_depth,
                              axis=(*range(-n_data_dims+1, 0),))
     return loss

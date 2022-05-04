@@ -163,7 +163,7 @@ def encoder_decoder_dense(latent_dim: int, input_shape: Tuple = (28, 28, 1), act
     for units in reversed(dense_units_lst[:-1]):
         h = Dense(units, activation=activation)(h)
         h = BatchNormalization()(h)
-    h = Dense(np.prod(input_shape), activation="sigmoid")(h)
+    h = Dense(np.prod(input_shape), activation=None)(h)
     x_reconstr = Reshape(input_shape)(h)
     decoder = Model(dec_in, x_reconstr)
 
@@ -209,7 +209,7 @@ def encoder_decoder_dislib_2d(latent_dim: int, height=64, width=64, depth=1, act
                             activation=activation)(h)
 
     x_reconstr = Conv2DTranspose(filters=depth, kernel_size=kernel_size_lst[0], strides=(2, 2), padding="same",
-                                 activation="sigmoid")(h)
+                                 activation=None)(h)
     decoder = Model(dec_in, x_reconstr)
 
     return encoder, decoder
