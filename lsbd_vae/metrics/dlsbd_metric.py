@@ -68,7 +68,7 @@ def calculate_pca_zg(g_elements_flat):
 
 def calculate_projected_zg0(projected_zg, k, angles_flat):
     """
-    Estimate the embedding for the basepoint basepoint h(x_0) = g_k^-1(PCA(zg)) = h(g^-1(x)). The spread of the
+    Estimate the embedding for the basepoint h(x_0) = g_k^-1(PCA(zg)) = h(g^-1(x)). The spread of the
     estimates measures the D_LSBD metric for a given k.
     :param projected_zg:
     :param k: Parameter of the inverse transformation
@@ -85,10 +85,6 @@ def calculate_projected_zg0(projected_zg, k, angles_flat):
 def dlsbd_k_torus(z, k, verbose=0):
     """
     D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
-    :param z:
-    :param k:
-    :param verbose:
-    :return:
     """
     # Regular spacing of angles in [0,2pi)
     # assume z_dim has shape (*n_angles, z_dim)
@@ -118,10 +114,6 @@ def dlsbd_k_torus(z, k, verbose=0):
 def dlsbd_k_cylinder(z, k, verbose=0):
     """
     D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
-    :param z:
-    :param k:
-    :param verbose:
-    :return:
     """
     # Regular spacing of angles in [0,2pi)
     # assume z_dim has shape (*n_angles, z_dim)
@@ -152,12 +144,6 @@ def dlsbd_k_cylinder(z, k, verbose=0):
 
 
 def dlsbd(z_loc, k_values, verbose=0, factor_manifold: str = "torus") -> Tuple[float, int]:
-    """
-    :param z_loc:
-    :param k_values:
-    :param verbose:
-    :return:
-    """
     available_manifolds = ["torus", "cylinder"]
     assert factor_manifold in available_manifolds, f"Factor manifold {factor_manifold} not available possible values " \
                                                    f"{available_manifolds}"
