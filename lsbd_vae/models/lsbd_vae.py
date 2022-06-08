@@ -410,8 +410,8 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
             image_input = data["images"]
             transformations = data["transformations"]
             # Estimate encoder parameters and sample
-            loc_parameter_estimates, scale_parameter_estimates, loc_avg, samples_avg, samples_nonavg = self.encoder_transformed(
-                [image_input, *transformations])
+            loc_parameter_estimates, scale_parameter_estimates, loc_avg, samples_avg, samples_nonavg = \
+                self.encoder_transformed([image_input, *transformations])
             z_non_avg = tf.keras.layers.Concatenate(-1)(samples_nonavg)
             z = tf.keras.layers.Concatenate(-1)(samples_avg)
             z_loc_anchored = tf.keras.layers.Concatenate(-1)(loc_avg)
