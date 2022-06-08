@@ -17,7 +17,9 @@ def make_rotation_matrix_2d(angles):
     Create rotation matrices of shape (num_angles, 2, 2)
     Args:
         angles: array of angles shaped as (num_angles,1)
+
     Returns:
+
     """
     cos_angle = np.cos(angles)
     sin_angle = np.sin(angles)
@@ -84,9 +86,7 @@ def dlsbd_k_torus(z, k, verbose=0):
     """
     D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
     :param z:
-    :param angles_combinations:
     :param k:
-    :param plot:
     :param verbose:
     :return:
     """
@@ -119,9 +119,7 @@ def dlsbd_k_cylinder(z, k, verbose=0):
     """
     D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
     :param z:
-    :param angles_combinations:
     :param k:
-    :param plot:
     :param verbose:
     :return:
     """
