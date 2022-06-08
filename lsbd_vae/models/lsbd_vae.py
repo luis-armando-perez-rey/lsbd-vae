@@ -100,7 +100,6 @@ class BaseLSBDVAE(tf.keras.Model):
         """
         Return encoder that processes input with shape (batch_size, num_transformations, *input_shape)
         :param input_layer: keras input layer with shape (num_transformations, *input_shape)
-        :return:
         """
         # Pass each image through the encoder, input_layer should have shape (num_transformations, *input_shape)
         lst_sample = []  # List of samples per latent space
@@ -123,7 +122,6 @@ class BaseLSBDVAE(tf.keras.Model):
     def set_encoder_flat(self) -> tf.keras.models.Model:
         """
         Set the encoder model that can receive images with shape (n_images, *image_shape)
-        :return:
         """
         # Pass each image through the encoder, input_layer should have shape (num_transformations, *input_shape)
         input_layer = tf.keras.layers.Input(self.input_shape_)
@@ -206,7 +204,6 @@ class BaseLSBDVAE(tf.keras.Model):
         """
         lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
         return lst_loc
-
 
     def encode_images_scale(self, input_images) -> List:
         """
@@ -353,8 +350,6 @@ class SupervisedLSBDVAE(BaseLSBDVAE):
         """
         Creates the encoder that incorporates inverse transformation for samples and averaging. Used only for data
         supervised with transformations. Transformation shape depends on the latent space.
-        Returns:
-
         """
         # Define the input
         multi_input_layer = tf.keras.layers.Input((self.n_transforms, *self.input_shape_))
@@ -459,13 +454,6 @@ class LSBDVAE(tf.keras.Model):
     """
 
     def call(self, inputs, training=None, mask=None):
-        """
-        Assume that we alwa
-        :param inputs:
-        :param training:
-        :param mask:
-        :return:
-        """
         return self.u_lsbd.call(inputs)
 
     def get_config(self):
