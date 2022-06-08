@@ -131,14 +131,11 @@ def get_encoder_decoder(architecture: str, image_shape: Tuple[int, int, int], la
             _, decoder = encoder_decoder_dense(**decoder_params)
             return encoder, decoder
 
-
     elif architecture == "simple_cnn":
         architecture_parameters = {"input_shape": image_shape,
                                    "features": 96,
                                    "latent_dim": latent_dim}
         architecture_function = get_encoder_decoder_simple_cnn
-
-
 
     else:
         raise ValueError(f"{architecture} not defined")

@@ -191,7 +191,6 @@ class BaseLSBDVAE(tf.keras.Model):
         dec_out = self.decoder(dec_in)
         return tf.keras.Model(encodings_list_input, dec_out)
 
-
     # region API Functions
     def encode_images(self, input_images) -> List:
         """

@@ -3,12 +3,12 @@ import os
 import tensorflow as tf
 import sys
 
-#sys.path.append(os.getcwd())
+# sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 from lsbd_vae.data_utils.data_loader import load_factor_data
-from lsbd_vae.models.lsbd_vae import UnsupervisedLSBDVAE, SupervisedLSBDVAE, LSBDVAE
+from lsbd_vae.models.lsbd_vae import UnsupervisedLSBDVAE, SupervisedLSBDVAE
 from lsbd_vae.models.architectures import encoder_decoder_dense
-from lsbd_vae.models.latentspace import HyperSphericalLatentSpace, GaussianLatentSpace
+from lsbd_vae.models.latentspace import HyperSphericalLatentSpace
 
 NUM_VIEWS = 12
 HEIGHT = 64
