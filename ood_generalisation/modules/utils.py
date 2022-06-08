@@ -14,12 +14,13 @@ def print_and_log_time(start, end, neptune_run=None, neptune_log_name=None):
         neptune_run[neptune_log_name + "/seconds"] = seconds
 
 
-def file_exists(filepath, extension=None, overwrite=False):
+def file_exists(filepath, overwrite=False, skip=False):
+    if skip:
+        print(f"Skipping {filepath} because skip=True.")
+        return True
     if overwrite:
         return False
     else:
-        if extension is not None:
-            filepath = filepath.parent / (filepath.name + extension)
         if filepath.is_file():
             print(f"File {filepath} already exists, skipping. Set overwrite=True to overwrite.")
         return filepath.is_file()

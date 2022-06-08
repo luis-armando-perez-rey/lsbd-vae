@@ -188,7 +188,7 @@ class BaseLSBDVAE(tf.keras.Model):
             input_images: array of shape (n_images, *image_shape)
 
         Returns:
-            Three lists of length n_latent_spaces each; of encodings, scale parameters and samples
+            List of length n_latent_spaces; of encodings with shape (n_images, ls_latent_dim)
         """
         lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
         return lst_loc
@@ -200,7 +200,7 @@ class BaseLSBDVAE(tf.keras.Model):
             input_images: array of shape (n_images, *image_shape)
 
         Returns:
-            Three lists of length n_latent_spaces each; of encodings, scale parameters and samples
+            List of length n_latent_spaces; of scale parameters with shape (n_images, scale_dim)
         """
         lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
         return lst_scale
@@ -212,7 +212,7 @@ class BaseLSBDVAE(tf.keras.Model):
             input_images: array of shape (n_images, *image_shape)
 
         Returns:
-            Three lists of length n_latent_spaces each; of encodings, scale parameters and samples
+            Two lists of length n_latent_spaces each; of encodings and scale parameters
         """
         lst_loc, lst_scale, lst_sample = self.encoder_flat.predict(input_images)
         return lst_loc, lst_scale

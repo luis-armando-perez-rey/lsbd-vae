@@ -2,7 +2,9 @@ import numpy as np
 import pickle
 import json
 
-from ood_generalisation.modules import plotting
+from lsbd_vae.metrics import dlsbd_metric
+
+from ood_generalisation.modules import plotting, data_selection
 
 
 def plot_reconstructions(lsbd, x, filepath, neptune_run=None):
@@ -41,7 +43,8 @@ def plot_circle_embeddings(images, factor_values_as_angles, lsbd, filepath, nept
         plotting.plot_circle_embedding(encodings_list[factor], colors, filepath_factor, neptune_run)
 
 
-def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, filepath, neptune_run=None, x_dim=0, y_dim=1):
+def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, filepath, neptune_run=None,
+                            x_dim=0, y_dim=1, factor_ranges=None):
     """
     F = number of factors (and number of latent spaces)
 
@@ -53,6 +56,7 @@ def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, fil
         neptune_run:
         x_dim: value in [0, F), distinct from y_dim
         y_dim: value in [0, F), distinct from x_dim
+        factor_ranges: if not None, darken the embeddings of datapoints within the given factor_ranges
     """
     assert x_dim != y_dim, "first and second dimensions should not be the same"
     assert x_dim < lsbd.n_latent_spaces and y_dim < lsbd.n_latent_spaces
@@ -66,15 +70,20 @@ def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, fil
     flat_images = np.reshape(images_grid, (-1, *images_grid.shape[-3:]))
     flat_factor_mesh = np.reshape(factor_values_as_angles_grid, (-1, factor_values_as_angles_grid.shape[-1]))
 
+    h_angle = flat_factor_mesh[:, x_dim]
+    v_angle = flat_factor_mesh[:, y_dim]
+    colors = plotting.yiq_embedding(v_angle, h_angle)
+
+    # if factor_ranges are given, give darker shade to the train data, thus highlighting the OOD data
+    if factor_ranges is not None:
+        indices_ood, indices_train = data_selection.select_factor_combinations(flat_factor_mesh, factor_ranges)
+        colors[indices_train] = colors[indices_train] * 0.6
+
     encodings_list = lsbd.encode_images(flat_images)
     # encoded list is a list of length n_latent_spaces, each item is an array of shape (n, ls_latent_dim)
 
-    v_angle = flat_factor_mesh[:, x_dim]
-    h_angle = flat_factor_mesh[:, y_dim]
-    colors = plotting.yiq_embedding(v_angle, h_angle)
-
-    encoded_horizontal_angle = np.arctan2(encodings_list[x_dim][:, 0], encodings_list[x_dim][:, 1])
-    encoded_vertical_angle = np.arctan2(encodings_list[y_dim][:, 0], encodings_list[y_dim][:, 1])
+    encoded_horizontal_angle = np.arctan2(encodings_list[x_dim][:, 1], encodings_list[x_dim][:, 0])
+    encoded_vertical_angle = np.arctan2(encodings_list[y_dim][:, 1], encodings_list[y_dim][:, 0])
     plotting.plot_torus_angles(encoded_horizontal_angle, encoded_vertical_angle, colors,
                                filepath=filepath, neptune_run=neptune_run)
 
@@ -82,9 +91,12 @@ def plot_2d_torus_embedding(images_grid, factor_values_as_angles_grid, lsbd, fil
 def plot_2d_latent_traverals_torus(lsbd, n_gridpoints, filepath, neptune_run=None, x_dim=0, y_dim=1):
     assert x_dim != y_dim, "first and second dimensions should not be the same"
     assert x_dim < lsbd.n_latent_spaces and y_dim < lsbd.n_latent_spaces
-    # linear spaces from 0 to 2*pi (exclusive)
-    angles_x = np.linspace(0, 2 * np.pi, num=n_gridpoints, endpoint=False)
-    angles_y = np.linspace(0, 2 * np.pi, num=n_gridpoints, endpoint=False)
+    # linear spaces between -pi and pi, shifted so the difference between first and last point is the same as all other
+    #   differences modulo 2pi. angles_x correspond to cols, angles_y to rows (following imshow convention, not matrix
+    #   convention, to match the embedding plots), angles_y given in reversed order (again to follow imshow convention)
+    halfstep = np.pi / n_gridpoints
+    angles_x = np.linspace(-np.pi + halfstep, np.pi - halfstep, num=n_gridpoints, endpoint=True)
+    angles_y = np.linspace(np.pi - halfstep, -np.pi + halfstep, num=n_gridpoints, endpoint=True)
     # transform to (n_gridpoints, 2) arrays of corresponding values on the unit circle
     grid_x = np.stack([np.cos(angles_x), np.sin(angles_x)], axis=1)
     grid_y = np.stack([np.cos(angles_y), np.sin(angles_y)], axis=1)
@@ -106,7 +118,6 @@ def plot_2d_latent_traverals_torus(lsbd, n_gridpoints, filepath, neptune_run=Non
             circlepoint = np.expand_dims(circlepoint, axis=0)  # shape (1, 2)
             circlepoint = np.tile(circlepoint, (n_gridpoints * n_gridpoints, 1))  # shape (n_gridpoints**2, 2)
             grid_flat.append(circlepoint)
-    #grid_flat = [grid_x_flat, grid_y_flat]
     # decode
     x_generated = lsbd.decode_latents(grid_flat)  # shape (n_gridpoints*n_gridpoints, *input_dim)
     x_generated = np.reshape(x_generated, (n_gridpoints, n_gridpoints, *x_generated.shape[1:]))
@@ -142,3 +153,18 @@ def ood_detection(lsbd, x_normal, x_ood, filepath, neptune_run=None):
         neptune_run[f"ood_scores/{filepath.name}_auprc"] = auprc
         neptune_run[f"ood_scores/{filepath.name}_mean_elbo_normal"] = mean_elbo_normal
         neptune_run[f"ood_scores/{filepath.name}_mean_elbo_ood"] = mean_elbo_ood
+
+
+def compute_d_lsbd(lsbd, images_grid, n_factors, filepath, neptune_run=None):
+    k_values = dlsbd_metric.create_combinations_k_values_range(-2, 2, n_transforms=n_factors)
+    flat_images = np.reshape(images_grid, (-1, *images_grid.shape[-3:]))  # works for images with n_data_dims=3
+    encodings_list = lsbd.encode_images(flat_images)  # n_latent_spaces lists of shape (n_images, ls_latent_dim) each
+    encodings_flat = np.concatenate(encodings_list, axis=1)  # array of shape (n_images, total_latent_dim)
+    encodings_grid = np.reshape(encodings_flat, (*images_grid.shape[:-3], encodings_flat.shape[1]))
+    score, k_min = dlsbd_metric.dlsbd(encodings_grid, k_values, factor_manifold="torus")
+
+    with open(filepath.parent / (filepath.name + ".p"), "wb") as f:
+        pickle.dump(score, f)
+
+    if neptune_run is not None:
+        neptune_run[f"disentanglement_metrics/{filepath.name}"] = score

@@ -2,6 +2,8 @@ import numpy as np
 import pickle
 import json
 
+from lsbd_vae.metrics import dlsbd_metric
+
 from ood_generalisation.modules import plotting
 
 
@@ -19,29 +21,6 @@ def plot_reconstructions(encoder, decoder, x, filepath, neptune_run=None):
     x_recon = decoder.predict(x_enc)
     x_array = np.stack([x, x_recon], axis=0)
     plotting.plot_images_grid(x_array, filepath=filepath, neptune_run=neptune_run)
-
-
-## TODO: this is for LSBD-VAE, adapt (1D traversals?) or remove
-def plot_circle_embeddings(images, factor_values_as_angles, lsbd, filepath, neptune_run=None, n_samples=500):
-    """
-    F = number of factors (and number of latent spaces)
-
-    Args:
-        images: shape (n_images, h, w, d)
-        factor_values_as_angles: shape (n_images, F), given as angles
-        lsbd: BaseLSBDVAE instance or subclass
-        filepath:
-        neptune_run:
-        n_samples: how many points to plot
-    """
-    sample_indices = np.random.choice(len(images), size=n_samples, replace=False)
-    images_sample = images[sample_indices]
-    factor_values_sample = factor_values_as_angles[sample_indices]
-    encodings_list = lsbd.encode_images(images_sample)
-    for factor in range(factor_values_as_angles.shape[-1]):
-        colors = factor_values_sample[:, factor]
-        filepath_factor = filepath.parent / (filepath.name + f"_{factor}.pdf")
-        plotting.plot_circle_embedding(encodings_list[factor], colors, filepath_factor, neptune_run)
 
 
 def plot_2d_embedding(images_grid, factor_values_as_angles_grid, encoder, filepath, neptune_run=None,
@@ -140,3 +119,17 @@ def ood_detection(loss_model, x_normal, x_ood, filepath, neptune_run=None):
         neptune_run[f"ood_scores/{filepath.name}_auprc"] = auprc
         neptune_run[f"ood_scores/{filepath.name}_mean_elbo_normal"] = mean_elbo_normal
         neptune_run[f"ood_scores/{filepath.name}_mean_elbo_ood"] = mean_elbo_ood
+
+
+def compute_d_lsbd(encoder, images_grid, n_factors, filepath, neptune_run=None):
+    k_values = dlsbd_metric.create_combinations_k_values_range(-2, 2, n_transforms=n_factors)
+    flat_images = np.reshape(images_grid, (-1, *images_grid.shape[-3:]))  # works for images with n_data_dims=3
+    encodings_flat = encoder.predict(flat_images)  # array of shape (n_images, latent_dim)
+    encodings_grid = np.reshape(encodings_flat, (*images_grid.shape[:-3], encodings_flat.shape[1]))
+    score, k_min = dlsbd_metric.dlsbd(encodings_grid, k_values, factor_manifold="torus")
+
+    with open(filepath.parent / (filepath.name + ".p"), "wb") as f:
+        pickle.dump(score, f)
+
+    if neptune_run is not None:
+        neptune_run[f"disentanglement_metrics/{filepath.name}"] = score

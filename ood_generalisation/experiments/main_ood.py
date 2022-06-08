@@ -48,6 +48,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
                 log_t_limit: tuple = (-10, -6), neptune_run=None, correct_dsprites_symmetries=False,
                 use_angles_for_selection=True, early_stopping=False):
     # region =setup data_class and latent spaces=
+    print("... setting up data class")
     dataset_class = load_factor_data(root_path=ROOT_PATH, **data_parameters)
     latent_spaces = []
     for _ in range(dataset_class.n_factors):
@@ -57,6 +58,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     # endregion
 
     # region =split up in training data and ood data=
+    print("... setting up training & ood data")
     images, images_train, images_ood, \
         factor_values_as_angles, factor_values_as_angles_train, factor_values_as_angles_ood, \
         factor_values_as_angles_grid = data_selection.split_up_data_ood(dataset_class, data_parameters,
@@ -65,6 +67,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
     # endregion
 
     # region =SETUP LSBD-VAE=
+    print("... setting up model")
     callbacks = []
     if neptune_run is not None:
         neptune_callback = utils.NeptuneMonitor(neptune_run)
@@ -85,6 +88,7 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
 
     if (save_path / "model_weights.index").is_file() is False:
         # region =setup (semi-)supervised train dataset=
+        print("... training new model")
         n_labels = len(images_train) // supervision_batch_size  # fully supervised
         x_l, x_l_transformations, x_u = \
             data_selection.setup_circles_dataset_labelled_batches(images_train, factor_values_as_angles_train, n_labels,
@@ -102,45 +106,53 @@ def run_lsbdvae(save_path: Path, data_parameters: dict, factor_ranges: tuple, ep
         # endregion
 
     else:  # load weights from previously trained model
+        print("... loading weights of previously trained model")
         lsbdvae.load_weights(save_path / "model_weights")
 
     # region =EVALUATIONS=
     # reconstructions of training data
     print("... plotting reconstructions")
     n_samples = 10
-    reconstr_train_path = save_path / "reconstructions_train"
-    if not utils.file_exists(reconstr_train_path, ".png"):
+    if not utils.file_exists(save_path / "reconstructions_train.png"):
         indices = np.random.choice(len(images_train), size=n_samples, replace=False)
         x_samples = images_train[indices]
-        evaluation.plot_reconstructions(lsbdvae, x_samples, reconstr_train_path, neptune_run)
+        evaluation.plot_reconstructions(lsbdvae, x_samples, save_path / "reconstructions_train", neptune_run)
     # reconstructions of ood data
-    reconstr_ood_path = save_path / "reconstructions_ood"
-    if images_ood is not None and not utils.file_exists(reconstr_ood_path, ".png"):
+    if images_ood is not None and not utils.file_exists(save_path / "reconstructions_ood.png"):
         indices = np.random.choice(len(images_ood), size=n_samples, replace=False)
         x_samples = images_ood[indices]
-        evaluation.plot_reconstructions(lsbdvae, x_samples, reconstr_ood_path, neptune_run)
+        evaluation.plot_reconstructions(lsbdvae, x_samples, save_path / "reconstructions_ood", neptune_run)
 
     # torus embeddings & latent traversals (in 2d grid for 2 factors)
     print("... plotting torus embeddings & latent traversals")
-    if not utils.file_exists(save_path / "2d_traversals_torus_0_1", ".png"):  # only check for first file
+    if not utils.file_exists(save_path / "2d_traversals_torus_0_1.png", overwrite=True):  # only check for first file
         for i in range(dataset_class.n_factors-1):
             for j in range(i+1, dataset_class.n_factors):
                 evaluation.plot_2d_latent_traverals_torus(lsbdvae, 10, save_path / f"2d_traversals_torus_{i}_{j}",
                                                           neptune_run, x_dim=i, y_dim=j)
                 evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_as_angles_grid, lsbdvae,
                                                    save_path / f"2d_embedding_{i}_{j}", neptune_run, x_dim=i, y_dim=j)
+                evaluation.plot_2d_torus_embedding(dataset_class.images, factor_values_as_angles_grid, lsbdvae,
+                                                   save_path / f"2d_embedding_{i}_{j}_ood", neptune_run,
+                                                   x_dim=i, y_dim=j, factor_ranges=factor_ranges)
 
     # circle embeddings, one for each latent space
     print("... plotting circle embeddings")
-    if not utils.file_exists(save_path / "circle_embeddings_0", ".pdf"):  # only check for first file
+    if not utils.file_exists(save_path / "circle_embeddings_0.pdf"):  # only check for first file
         evaluation.plot_circle_embeddings(images, factor_values_as_angles, lsbdvae, save_path / "circle_embeddings",
                                           neptune_run)
 
     # density plots for training vs ood
     # check if density plots file exists, if yes assume all OOD files exist and skip this
-    if images_ood is not None and not utils.file_exists(save_path / "ood_detection_dens", ".pdf", overwrite=True):
+    if images_ood is not None and not utils.file_exists(save_path / "ood_detection_dens.pdf", overwrite=False):
         print("... plotting OOD detection plots & computing AUC scores")
         evaluation.ood_detection(lsbdvae, images_train, images_ood, save_path / "ood_detection", neptune_run)
+
+    # calculate D_LSBD metric
+    print("... computing d_lsbd metric")
+    if not utils.file_exists(save_path / "d_lsbd.p", skip=True):
+        evaluation.compute_d_lsbd(lsbdvae, dataset_class.images, dataset_class.n_factors, save_path / "d_lsbd",
+                                  neptune_run)
     # endregion
 
 

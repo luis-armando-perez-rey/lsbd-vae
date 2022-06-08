@@ -21,6 +21,11 @@ FACTOR_RANGES_2D_1_16 = ((0, 0.5*np.pi), (0, 0.5*np.pi))
 FACTOR_RANGES_2D_QUADRANT = ((0, np.pi), (0, np.pi))
 FACTOR_RANGES_2D_9_16 = ((0, 1.5*np.pi), (0, 1.5*np.pi))
 
+
+def factor_ranges_2d_square(fraction=0.5):
+    return (0, fraction*2*np.pi), (0, fraction*2*np.pi)
+
+
 # for dsprites, which has factor shape (3, 6, 40, 32, 32), factors ["shape", "scale", "orientation", "x_pos", "y_pos"]
 #   shape: [0., 1., 2.] (0=square, 1=ellips, 2=heart)
 #   scale: [0. , 0.2, 0.4, 0.6, 0.8, 1. ]
@@ -58,9 +63,17 @@ DATA_RANGES_ANGLES = {
     "arrow_1_16": (ARROW_PARAMETERS, FACTOR_RANGES_2D_1_16, True),
     "arrow_quadrant": (ARROW_PARAMETERS, FACTOR_RANGES_2D_QUADRANT, True),
     "arrow_9_16": (ARROW_PARAMETERS, FACTOR_RANGES_2D_9_16, True),
+    "arrow_125": (ARROW_PARAMETERS, factor_ranges_2d_square(0.125), True),
+    "arrow_375": (ARROW_PARAMETERS, factor_ranges_2d_square(0.375), True),
+    "arrow_625": (ARROW_PARAMETERS, factor_ranges_2d_square(0.625), True),
+    "arrow_875": (ARROW_PARAMETERS, factor_ranges_2d_square(0.875), True),
     "square_1_16": (SQUARE_PARAMETERS, FACTOR_RANGES_2D_1_16, True),
     "square_quadrant": (SQUARE_PARAMETERS, FACTOR_RANGES_2D_QUADRANT, True),
     "square_9_16": (SQUARE_PARAMETERS, FACTOR_RANGES_2D_9_16, True),
+    "square_125": (SQUARE_PARAMETERS, factor_ranges_2d_square(0.125), True),
+    "square_375": (SQUARE_PARAMETERS, factor_ranges_2d_square(0.375), True),
+    "square_625": (SQUARE_PARAMETERS, factor_ranges_2d_square(0.625), True),
+    "square_875": (SQUARE_PARAMETERS, factor_ranges_2d_square(0.875), True),
     "dsprites_rte": ({"data": "dsprites"}, FACTOR_RANGES_DSPRITES_RTE, False),
     "dsprites_rtr": ({"data": "dsprites"}, FACTOR_RANGES_DSPRITES_RTR_POSX, False),
     "dsprites_extr": ({"data": "dsprites"}, FACTOR_RANGES_DSPRITES_EXTR_050, False),
@@ -77,9 +90,17 @@ DATASET_INTERESTING_LATENT_DIMS = {
     "arrow_1_16": (0, 1),
     "arrow_quadrant": (0, 1),
     "arrow_9_16": (0, 1),
+    "arrow_125": (0, 1),
+    "arrow_375": (0, 1),
+    "arrow_625": (0, 1),
+    "arrow_875": (0, 1),
     "square_1_16": (0, 1),
     "square_quadrant": (0, 1),
     "square_9_16": (0, 1),
+    "square_125": (0, 1),
+    "square_375": (0, 1),
+    "square_625": (0, 1),
+    "square_875": (0, 1),
     "dsprites_rte": (3, 4),
     "dsprites_rtr": (0, 3),
     "dsprites_extr": (3, 4),

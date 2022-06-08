@@ -50,23 +50,24 @@ FACTOR_RANGES_LISTOFLISTS =\
 
 n_repetitions = 3
 
+FRACTION_LIST = (0.125, 0.375, 0.625, 0.875)  # I already have 0.25, 0.5 and 0.75 as 1_16, QUADRANT, 9_16
 
 if __name__ == "__main__":
-    # for data_parameters, use_angles, factor_ranges_list in zip(DATA_PARAMS_LIST, USE_ANGLES_LIST, FACTOR_RANGES_LISTOFLISTS):
-    #     for factor_ranges in factor_ranges_list:
-    for factor_ranges in [presets.FACTOR_RANGES_DSPRITES_RTR_POSX, presets.FACTOR_RANGES_DSPRITES_EXTR_050]:
-        for _ in range(n_repetitions):
-            kwargs_lsbdvae_ = {
-                "data_parameters": {"data": "dsprites"}, "use_angles_for_selection": False,
-                "factor_ranges": factor_ranges,
-                "epochs": 200,
-                "batch_size": 8,
-                "supervision_batch_size": 32,
-                "architecture": "dislib",  # "dense", "conv", "dislib"
-                "reconstruction_loss": "bernoulli",  # "gaussian", "bernoulli"
-                "log_t_limit": (-10, -6),
-                "correct_dsprites_symmetries": True,
-                "early_stopping": True,
-            }
-            main_ood.main(kwargs_lsbdvae_)
-            print("Done!")
+    for data_parameters in [presets.SQUARE_PARAMETERS, presets.ARROW_PARAMETERS]:
+        for fraction in FRACTION_LIST:
+            factor_ranges = presets.factor_ranges_2d_square(fraction)
+            for _ in range(n_repetitions):
+                kwargs_lsbdvae_ = {
+                    "data_parameters": data_parameters, "use_angles_for_selection": True,
+                    "factor_ranges": factor_ranges,
+                    "epochs": 200,
+                    "batch_size": 8,
+                    "supervision_batch_size": 32,
+                    "architecture": "dislib",  # "dense", "conv", "dislib"
+                    "reconstruction_loss": "bernoulli",  # "gaussian", "bernoulli"
+                    "log_t_limit": (-10, -6),
+                    "correct_dsprites_symmetries": True,
+                    "early_stopping": True,
+                }
+                main_ood.main(kwargs_lsbdvae_)
+                print("Done!")
