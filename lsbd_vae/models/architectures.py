@@ -58,77 +58,7 @@ def get_encoder_decoder(architecture: str, image_shape: Tuple[int, int, int], la
             encoder = Model(input_layer, x)
             print("Encoder shape", tf.shape(encoder.input))
             encoder.trainable = True
-            _, decoder = encoder_decoder_dense(**decoder_params)
-            return encoder, decoder
-
-    elif architecture == "resnet50v2_modelnet_dense_trainable":
-        architecture_parameters = {"encoder_params": {},
-                                   "decoder_params":
-                                       {"input_shape": image_shape,
-                                        "dense_units_lst": (512, 512, 256),
-                                        "latent_dim": latent_dim}
-                                   }
-
-        def architecture_function(encoder_params, decoder_params):
-            encoder_preload = tf.keras.models.load_model(
-                "/home/luis/sources_uncertainty/notebooks/luis/mvcnn/transferred_modelnet")
-            input_layer = Input(image_shape)
-            x = encoder_preload(input_layer)
-            encoder = Model(input_layer, x)
-            encoder.trainable = True
-            _, decoder = encoder_decoder_dense(**decoder_params)
-            return encoder, decoder
-    elif architecture == "resnet50v2_modelnet_dense":
-        architecture_parameters = {"encoder_params": {},
-                                   "decoder_params":
-                                       {"input_shape": image_shape,
-                                        "dense_units_lst": (512, 512, 256),
-                                        "latent_dim": latent_dim}
-                                   }
-
-        def architecture_function(encoder_params, decoder_params):
-            encoder_preload = tf.keras.models.load_model(
-                "/home/luis/sources_uncertainty/notebooks/luis/mvcnn/transferred_modelnet")
-            input_layer = Input(image_shape)
-            x = encoder_preload(input_layer)
-            encoder = Model(input_layer, x)
-            encoder.trainable = False
-            _, decoder = encoder_decoder_dense(**decoder_params)
-            return encoder, decoder
-
-    elif architecture == "resnet16_modelnet_dense_trainable":
-        architecture_parameters = {"encoder_params": {},
-                                   "decoder_params":
-                                       {"input_shape": image_shape,
-                                        "dense_units_lst": (512, 512, 256),
-                                        "latent_dim": latent_dim}
-                                   }
-
-        def architecture_function(encoder_params, decoder_params):
-            encoder_preload = tf.keras.models.load_model(
-                "/home/luis/sources_uncertainty/notebooks/luis/mvcnn/transferred_modelnet_16")
-            input_layer = Input(image_shape)
-            x = encoder_preload(input_layer)
-            encoder = Model(input_layer, x)
-            encoder.trainable = True
-            _, decoder = encoder_decoder_dense(**decoder_params)
-            return encoder, decoder
-    elif architecture == "resnet16_modelnet_dense":
-        architecture_parameters = {"encoder_params": {},
-                                   "decoder_params":
-                                       {"input_shape": image_shape,
-                                        "dense_units_lst": (512, 512, 256),
-                                        "latent_dim": latent_dim}
-                                   }
-
-        def architecture_function(encoder_params, decoder_params):
-            encoder_preload = tf.keras.models.load_model(
-                "/home/luis/sources_uncertainty/notebooks/luis/mvcnn/transferred_modelnet_16")
-            input_layer = Input(image_shape)
-            x = encoder_preload(input_layer)
-            encoder = Model(input_layer, x)
-            encoder.trainable = False
-            _, decoder = encoder_decoder_dense(**decoder_params)
+            [_, decoder] = encoder_decoder_dense(**decoder_params)
             return encoder, decoder
 
 
