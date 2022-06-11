@@ -61,14 +61,11 @@ def get_encoder_decoder(architecture: str, image_shape: Tuple[int, int, int], la
             [_, decoder] = encoder_decoder_dense(**decoder_params)
             return encoder, decoder
 
-
     elif architecture == "simple_cnn":
         architecture_parameters = {"input_shape": image_shape,
                                    "features": 96,
                                    "latent_dim": latent_dim}
         architecture_function = get_encoder_decoder_simple_cnn
-
-
 
     else:
         raise ValueError(f"{architecture} not defined")
@@ -100,22 +97,80 @@ def encoder_decoder_dense(latent_dim: int, input_shape: Tuple = (28, 28, 1), act
     return encoder, decoder
 
 
-def encoder_decoder_dislib_2d(latent_dim: int, height=64, width=64, depth=1, activation="relu",
-                              filters_lst=(32, 32, 64, 64),
-                              kernel_size_lst=((4, 4), (4, 4), (4, 4), (4, 4)),
-                              dense_units_lst=(256,),
-                              ):
-    assert len(filters_lst) == len(kernel_size_lst), \
-        "lists for filters/kernel_size/pool_size must be of the same length"
+def encoder_decoder_vgglike_2d(latent_dim: int, input_shape: Tuple = (64, 64, 1), activation: str = "relu",
+                               filters_lst: Tuple = (128, 64, 32), dense_units_lst: Tuple = (64,),
+                               kernel_size: int = 3, pool_size: int = 2):
+    """
+    Simple but general convolutional architecture. Uses fixed kernel_size & pool_size. Customisable nr of conv2d layers,
+    optional dense layers. Uses MaxPooling and UpSampling.
+    """
     n_conv_layers = len(filters_lst)
-    input_shape = (height, width, depth)
+    height, width, depth = input_shape
+    # calculate sizes after convolutions (before dense layers)
+    conv_height = height // (pool_size ** n_conv_layers)
+    conv_width = width // (pool_size ** n_conv_layers)
+    conv_depth = filters_lst[-1]
+    assert height == conv_height * (pool_size ** n_conv_layers), "height must be a multiple of pool_size^n_conv_layers"
+    assert width == conv_width * (pool_size ** n_conv_layers), "width must be a multiple of pool_size^n_conv_layers"
 
     # ENCODER
     x = Input(shape=input_shape)
     # convolutional layers
     h = x
     for i in range(n_conv_layers):
-        h = Conv2D(filters=filters_lst[i], kernel_size=kernel_size_lst[i], strides=(2, 2), padding="same",
+        h = Conv2D(filters=filters_lst[i], kernel_size=kernel_size, strides=(1, 1), padding="same",
+                   activation=activation)(h)
+        h = MaxPooling2D(pool_size=pool_size, padding="same")(h)
+    # dense layers
+    h = Flatten()(h)
+    for units in dense_units_lst:
+        h = Dense(units, activation=activation)(h)
+    encoder = Model(x, h)
+
+    # DECODER
+    dec_in = Input(shape=(latent_dim,))
+    # dense layers
+    h = dec_in
+    for units in reversed(dense_units_lst):
+        h = Dense(units, activation=activation)(h)
+    h = Dense(conv_height * conv_width * conv_depth, activation=activation)(h)
+    h = Reshape((conv_height, conv_width, conv_depth))(h)
+    # convolutional layers
+    for i in reversed(range(1, n_conv_layers)):
+        h = UpSampling2D(size=pool_size)(h)
+        h = Conv2D(filters=filters_lst[i - 1], kernel_size=kernel_size, strides=(1, 1), padding="same",
+                   activation=activation)(h)
+    h = UpSampling2D(size=pool_size)(h)
+    x_reconstr = Conv2D(filters=depth, kernel_size=kernel_size, strides=(1, 1), padding="same",
+                        activation="sigmoid")(h)
+    decoder = Model(dec_in, x_reconstr)
+
+    return encoder, decoder
+
+
+def encoder_decoder_dislib_2d(latent_dim: int, input_shape: Tuple = (64, 64, 1), activation: str = "relu",
+                              filters_lst: Tuple = (32, 32, 64, 64), dense_units_lst: Tuple = (256,),
+                              kernel_size: int = 4, strides: int = 2):
+    """
+    Simple but general convolutional architecture. Uses fixed kernel_size & pool_size. Customisable nr of conv2d layers,
+    optional dense layers. Uses strided (transposed) convolutions.
+    If used with default settings, this corresponds to the convolutional architecture from disentanglement_lib.
+    """
+    n_conv_layers = len(filters_lst)
+    height, width, depth = input_shape
+    # calculate sizes after convolutions (before dense layers)
+    conv_height = height // (strides ** n_conv_layers)
+    conv_width = width // (strides ** n_conv_layers)
+    conv_depth = filters_lst[-1]
+    assert height == conv_height * (strides ** n_conv_layers), "height must be a multiple of pool_size^n_conv_layers"
+    assert width == conv_width * (strides ** n_conv_layers), "width must be a multiple of pool_size^n_conv_layers"
+
+    # ENCODER
+    x = Input(shape=input_shape)
+    # convolutional layers
+    h = x
+    for i in range(n_conv_layers):
+        h = Conv2D(filters=filters_lst[i], kernel_size=kernel_size, strides=strides, padding="same",
                    activation=activation)(h)
     # dense layers
     h = Flatten()(h)
@@ -125,21 +180,18 @@ def encoder_decoder_dislib_2d(latent_dim: int, height=64, width=64, depth=1, act
 
     # DECODER
     dec_in = Input(shape=(latent_dim,))
-    h = Dense(dense_units_lst[-1], activation)(dec_in)
-    conv_dim = (height) // 2 ** (n_conv_layers) * (width) // 2 ** (n_conv_layers) * filters_lst[-1]
     # dense layers
-    for units in reversed(dense_units_lst[:-1]):
+    h = dec_in
+    for units in reversed(dense_units_lst):
         h = Dense(units, activation=activation)(h)
-
-    h = Dense(conv_dim, activation=activation)(h)
-    h = Reshape(((height) // 2 ** (n_conv_layers), (width) // 2 ** (n_conv_layers), filters_lst[-1]))(h)
+    h = Dense(conv_height * conv_width * conv_depth, activation=activation)(h)
+    h = Reshape((conv_height, conv_width, conv_depth))(h)
     # convolutional layers
-    for i in reversed(range(0, n_conv_layers - 1)):
-        h = Conv2DTranspose(filters=filters_lst[i], kernel_size=kernel_size_lst[i], strides=(2, 2), padding="same",
+    for i in reversed(range(1, n_conv_layers)):
+        h = Conv2DTranspose(filters=filters_lst[i - 1], kernel_size=kernel_size, strides=strides, padding="same",
                             activation=activation)(h)
-
-    x_reconstr = Conv2DTranspose(filters=depth, kernel_size=kernel_size_lst[0], strides=(2, 2), padding="same",
-                                 activation=None)(h)
+    x_reconstr = Conv2DTranspose(filters=depth, kernel_size=kernel_size, strides=strides, padding="same",
+                                 activation="sigmoid")(h)
     decoder = Model(dec_in, x_reconstr)
 
     return encoder, decoder
@@ -180,4 +232,5 @@ def get_encoder_decoder_simple_cnn(input_shape, latent_dim, features=96):
     CT4 = Conv2D(input_shape[-1], 7, padding='valid', activation='tanh', name='recons')(TP4)
 
     decoder = Model(latent_input, CT4)
+
     return encoder, decoder

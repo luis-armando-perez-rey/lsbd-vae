@@ -113,5 +113,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Added by luis
+# Added by us
 .idea/
+data/
+run_*
+jupyter_notebooks/

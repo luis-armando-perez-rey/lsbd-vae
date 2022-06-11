@@ -2,114 +2,29 @@ import numpy as np
 import os
 from PIL import Image
 import h5py
-import json
 import tensorflow as tf
-import tensorflow_datasets as tfds
-from skimage.transform import resize
+
 from typing import Type
 
-from lsbd_vae.data.factor_dataset import FactorImageDataset
-from lsbd_vae.data.transform_image import TransformImage
+from lsbd_vae.data_utils.factor_dataset import FactorImageDataset
+from lsbd_vae.data_utils.transform_image import TransformImage
 
 
 def load_factor_data(data, root_path=None, **kwargs) -> Type[FactorImageDataset]:
     options_dict = {
-        "sim_toy": get_sim_toy,
         "modelnet_colors": get_modelnet_colors,
         "pixel": get_transformed_pixel,
         "arrow": get_transformed_arrow,
-        "transformed_image": get_transformed_image,
         "modelnet40": get_h5_saved_data,
-        "modelnet_cars": get_modelnet_cars,
         "coil100": get_coil100,
-        "smallnorb": get_smallnorb,
     }
     return options_dict[data](root_path, **kwargs)
-
-
-def get_sim_toy(root_path):
-    assert root_path is not None, "project root path is not supplied"
-    filepath = os.path.join(root_path, "data", "sim_toy_ordered", "sim_toy_np_ordered.npz")
-    with np.load(filepath, mmap_mode="r") as f:
-        images = f["images"]
-    images = images.astype('float32') / 255.
-    images = images.reshape((4, 4, 2, 3, 3, 40, 40, 64, 64, 3))
-    factor_names = ["object_color", "object_shape", "object_size", "camera_height", "background_color",
-                    "horizontal_axis", "vertical_axis"]
-    return FactorImageDataset(images, factor_names=factor_names)
-
-
-def get_modelnet_cars(root_path,
-                      resolution=[64, 64],
-                      intensities=np.arange(0, 6),
-                      colors=np.arange(0, 6),
-                      azimuths=np.arange(0, 6),
-                      elevations=np.arange(0, 6),
-                      locations=np.arange(0, 6)
-                      ):
-    factor_names = ["identity", "color", "azimuth", "elevation", "light_location", "intensity"]
-    print("Start loading of ModelNet cars dataset ...")
-    total_factors = 6
-    filenames = os.listdir(root_path)
-    unique_ids = np.unique([filename.split("_")[1] for filename in filenames])
-    factor_values = np.zeros(
-        (len(unique_ids), len(colors), len(azimuths), len(elevations), len(locations), len(intensities), total_factors),
-        dtype=int)
-    images = np.zeros((len(unique_ids), len(colors), len(azimuths), len(elevations), len(locations), len(intensities),
-                       resolution[0], resolution[1], 3))
-    print("Images shape", images.shape)
-    # Load the JSON file with the car labels
-    with open(os.path.join(os.path.dirname(root_path), "labels_per_car.json")) as f:
-        labels_dictionary = json.load(f)
-    labels = np.zeros((len(unique_ids), len(colors), len(azimuths), len(elevations), len(locations), len(intensities)),
-                      dtype=int)
-    for num_id, unique_id in enumerate(unique_ids):
-        for num_intensity, intensity in enumerate(intensities):
-            for num_color, color in enumerate(colors):
-                for num_azimuth, azimuth in enumerate(azimuths):
-                    for num_elevation, elevation in enumerate(elevations):
-                        for num_location, location in enumerate(locations):
-                            labels[num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity] = \
-                                labels_dictionary[unique_id]
-                            filename = "car_" + unique_id + "_" \
-                                       + str(color) + "_" \
-                                       + str(azimuth) + "_" \
-                                       + str(elevation + 1) + "_" \
-                                       + str(location) + "_" \
-                                       + str(intensity) + ".png"
-                            filepath = os.path.join(root_path, filename)
-                            images[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity] = np.array(
-                                Image.open(filepath).resize(resolution))[:, :, :3] / 255.0
-                            factor_values[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity, 0] = int(
-                                unique_id)
-                            factor_values[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity, 1] = int(
-                                color)
-                            factor_values[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity, 2] = int(
-                                azimuth)
-                            factor_values[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity, 3] = int(
-                                elevation)
-                            factor_values[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity, 4] = int(
-                                location)
-                            factor_values[
-                                num_id, num_color, num_azimuth, num_elevation, num_location, num_intensity, 5] = int(
-                                intensity)
-    return FactorImageDataset(images, factor_names=factor_names, labels=np.array(labels))
 
 
 def get_transformed_pixel(root_path, height=32, width=32, square_size=1, **kwargs_transform):
     pixel_img = np.zeros((height, width, 1))
     pixel_img[0:square_size, 0:square_size, 0] = 1
     return TransformImage(pixel_img, **kwargs_transform)
-
-
-def get_transformed_image(root_path, image, **kwargs_transform):
-    return TransformImage(image, **kwargs_transform)
 
 
 def get_transformed_arrow(root_path, arrow_size=32, **kwargs_transform):
@@ -240,6 +155,7 @@ def get_h5_saved_data(root_path, collection_list, data_type, dataset_directory, 
 
 
 def get_coil100(root_path, rescale_size=64):
+    import tensorflow_datasets as tfds
     # load dataset from tfds
     data_path = os.path.join(root_path, "data", "tfds_coil100")
     ds = tfds.load(
@@ -275,48 +191,6 @@ def get_coil100(root_path, rescale_size=64):
     images = images / 255.
 
     return FactorImageDataset(images, factor_names=["obj_id", "angle"], labels=obj_ids_factor)
-
-
-def get_smallnorb(root_path, angles_only=True, rescale_size=64):
-    # load dataset from tfds
-    data_path = os.path.join(root_path, "data", "tfds_smallnorb")
-    ds_np = tfds.as_numpy(tfds.load(
-        'smallnorb',
-        split=['train', 'test'],
-        batch_size=-1,
-        data_dir=data_path
-    ))
-    x_train, x_test = ds_np
-    image = np.concatenate([x_train["image"], x_test["image"]], axis=0)
-    image2 = np.concatenate([x_train["image2"], x_test["image2"]], axis=0)
-
-    label_azimuth = np.concatenate([x_train["label_azimuth"], x_test["label_azimuth"]], axis=0)
-    instance = np.concatenate([x_train["instance"], x_test["instance"]], axis=0)
-    label_category = np.concatenate([x_train["label_category"], x_test["label_category"]], axis=0)
-    label_elevation = np.concatenate([x_train["label_elevation"], x_test["label_elevation"]], axis=0)
-    label_lighting = np.concatenate([x_train["label_lighting"], x_test["label_lighting"]], axis=0)
-
-    ind = np.lexsort((label_azimuth, instance, label_category, label_elevation, label_lighting))
-    image_sorted = image[ind]
-    image2_sorted = image2[ind]
-    image_factor = np.reshape(image_sorted, (6, 9, 5, 10, 18, 96, 96, 1))
-    image2_factor = np.reshape(image2_sorted, (6, 9, 5, 10, 18, 96, 96, 1))
-    images_factor = np.stack([image_factor, image2_factor], axis=0)  # shape (2, 6, 9, 5, 10, 18, 96, 96, 1)
-
-    if angles_only:
-        images_factor = np.reshape(images_factor, (2 * 6 * 9 * 5 * 10, 18, 96, 96, 1))
-        factor_names = ["other", "angle"]
-    else:
-        factor_names = ["camera", "lighting", "elevation", "category", "instance", "angle"]
-
-    # normalize
-    images_factor = images_factor.astype('float32') / 255.
-
-    # rescale if needed (set rescale_size=None to skip)
-    if rescale_size is not None:
-        images_factor = resize(images_factor, images_factor.shape[:-3] + (rescale_size, rescale_size, 1))
-
-    return FactorImageDataset(images_factor, factor_names=factor_names)
 
 
 def read_data_h5(data_filepath, data_type):
