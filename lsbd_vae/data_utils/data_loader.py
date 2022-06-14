@@ -3,14 +3,11 @@ import os
 from PIL import Image
 import h5py
 import tensorflow as tf
-
-from typing import Type
-
-from lsbd_vae.data_utils.factor_dataset import FactorImageDataset
 from lsbd_vae.data_utils.transform_image import TransformImage
+from lsbd_vae.data_utils.factor_dataset import FactorImageDataset
 
 
-def load_factor_data(data, root_path=None, **kwargs) -> Type[FactorImageDataset]:
+def load_factor_data(data, root_path=None, **kwargs) -> FactorImageDataset:
     options_dict = {
         "modelnet_colors": get_modelnet_colors,
         "pixel": get_transformed_pixel,
@@ -21,14 +18,24 @@ def load_factor_data(data, root_path=None, **kwargs) -> Type[FactorImageDataset]
     return options_dict[data](root_path, **kwargs)
 
 
-def get_transformed_pixel(root_path, height=32, width=32, square_size=1, **kwargs_transform):
+# noinspection PyUnusedLocal
+def get_transformed_pixel(root_path: str, height: int = 32, width: int = 32, square_size: int = 1, **kwargs_transform):
+    """
+    Returns a TransformImage object created from a square of pixels
+    :param root_path: not used in this function
+    :param height: height of the image
+    :param width: width of the image
+    :param square_size: size of the square in pixels
+    :param kwargs_transform: extra arguments passed to the TransformImage constructor
+    :return:
+    """
     pixel_img = np.zeros((height, width, 1))
     pixel_img[0:square_size, 0:square_size, 0] = 1
     return TransformImage(pixel_img, **kwargs_transform)
 
 
 def get_transformed_arrow(root_path, arrow_size=32, **kwargs_transform):
-    assert arrow_size in [32, 64, 128], "arrow size not supported"
+    assert arrow_size in [32, 64, 128], f"arrow size {arrow_size} not supported"
     image_rgba = Image.open(os.path.join(root_path, "data", "single_images", f"arrow_{arrow_size}.png"))
     image_rgb = image_rgba.convert("RGB")
     arrow_img = np.asarray(image_rgb)
@@ -76,43 +83,44 @@ def get_h5_saved_data(root_path, collection_list, data_type, dataset_directory, 
     Returns a TransformImage object created from ModelNet40 dataset of objects with periodic colors and rotated
     Args:
         root_path: path to the root of the project
-        dataset_filename: filename of the .h5 data to be loaded
-        object_type: type of object saved in the data file
         normalize: whether data should be in the range [0,1] (True) or [0, 255] (False).
+        collection_list: list of collections (object types) to load
+        data_type: type of data to load
+        dataset_directory: directory where the data is stored
 
     Returns:
         FactorImageDataset object
+
     """
-    AVAILABLE_COLLECTIONS = ["Shape", "Culture"]
     # Add ModelNet classes`
-    AVAILABLE_COLLECTIONS += ["airplane",
-                              "bathtub", "bed", "bench", "bookshelf", "bottle", "bowl",
-                              "car", "chair", "cone", "cup", "curtain",
-                              "desk", "door", "dresser",
-                              "flower_pot",
-                              "glass_box",
-                              "guitar",
-                              "keyboard",
-                              "lamp", "laptop",
-                              "mantel", "monitor",
-                              "night_stand",
-                              "person", "piano", "plant",
-                              "radio", "range_hood",
-                              "sink", "sofa", "stairs", "stool",
-                              "table", "tent", "toilet", "tv_stand",
-                              "vase",
-                              "wardrobe",
-                              "xbox"]
-    AVAILABLE_DATA_TYPES = ["train", "test"]
+    available_collections = ["airplane",
+                             "bathtub", "bed", "bench", "bookshelf", "bottle", "bowl",
+                             "car", "chair", "cone", "cup", "curtain",
+                             "desk", "door", "dresser",
+                             "flower_pot",
+                             "glass_box",
+                             "guitar",
+                             "keyboard",
+                             "lamp", "laptop",
+                             "mantel", "monitor",
+                             "night_stand",
+                             "person", "piano", "plant",
+                             "radio", "range_hood",
+                             "sink", "sofa", "stairs", "stool",
+                             "table", "tent", "toilet", "tv_stand",
+                             "vase",
+                             "wardrobe",
+                             "xbox"]
+    available_data_types = ["train", "test"]
     image_list = []
     views_list = []
     labels_list = []
     ids_list = []
     for num_collection, collection in enumerate(collection_list):
-        assert collection in AVAILABLE_COLLECTIONS, "collection_list = {} is not available. Possible values are {}".format(
-            collection, AVAILABLE_COLLECTIONS)
-        assert data_type in AVAILABLE_DATA_TYPES, "data_type = {} is not available. Possible values are {}".format(
-            data_type, AVAILABLE_DATA_TYPES)
+        assert collection in available_collections, f"collection_list = {collection} is not available. Possible" \
+                                                    f" values are {available_collections}"
+        assert data_type in available_data_types, f"data_type = {data_type} is not available. Possible values " \
+                                                  f"are {available_data_types}"
 
         dataset_filename = collection + "_" + data_type + ".h5"
         print(f"Loading file {num_collection} ", dataset_filename)
@@ -126,9 +134,10 @@ def get_h5_saved_data(root_path, collection_list, data_type, dataset_directory, 
         views = read_data_h5(dataset_filepath, "views")
         views_list.append(views)
         # Read category integer class_labels
+
         try:
             labels = read_data_h5(dataset_filepath, "class_int")
-        except:
+        except FileNotFoundError:
             print("No labels detected in the dataset")
             labels = None
         labels_list.append(labels)
@@ -208,7 +217,6 @@ def read_data_h5(data_filepath, data_type):
     return data
 
 
-# noinspection PyBroadException
 def read_modelnet_data_h5(data_filepath, object_type, data_type):
     """
     Args:
@@ -226,13 +234,8 @@ def read_modelnet_data_h5(data_filepath, object_type, data_type):
                     ids_data = object_data.get(identity)
                     data = np.array(ids_data.get(data_type))
         else:
-            try:
-                object_data = file.get(object_type)
-                for identity in object_data.keys():
-                    ids_data = object_data.get(identity)
-                    data = np.array(ids_data.get(data_type))
-            except:
-                print(
-                    f"Data with object type: {object_type} and data type {data_type} is not available in {data_filepath}")
-                data = None
+            object_data = file.get(object_type)
+            for identity in object_data.keys():
+                ids_data = object_data.get(identity)
+                data = np.array(ids_data.get(data_type))
     return data
