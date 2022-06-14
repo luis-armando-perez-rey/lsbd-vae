@@ -1,7 +1,8 @@
 import os
 
 # Load data
-PROJECT_PATH = os.path.dirname(os.path.dirname(__file__))
+PROJECT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
 
 def return_data_parameters(data_name):
     if data_name == "arrow":
@@ -56,8 +57,6 @@ def return_data_parameters(data_name):
             "dataset_directory": ""
         }
     elif data_name == "r_modelnet40_train":
-
-        print(os.path.join(PROJECT_PATH, "data/aligned64"))
         data_parameters = {
             "root_path": os.path.join(PROJECT_PATH, "data/aligned64"),
             "data": "modelnet40",
@@ -126,7 +125,6 @@ def return_data_parameters(data_name):
             "data_type": "test",
             "dataset_directory": ""
         }
-
 
     elif data_name == "coil100":
         data_parameters = {
