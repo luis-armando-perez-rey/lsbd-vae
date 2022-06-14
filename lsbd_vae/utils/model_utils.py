@@ -2,9 +2,11 @@ import os
 import sys
 import numpy as np
 from typing import List, Optional, Dict
+from tensorflow.keras.models import Model
 
 sys.path.append(os.getcwd())
 from lsbd_vae.models.latentspace import LatentSpace, GaussianLatentSpace, HyperSphericalLatentSpace
+from lsbd_vae.models.lsbd_vae import LSBDVAE
 
 LATENT_SPACE_MAP = {
     "e": GaussianLatentSpace,
@@ -40,3 +42,25 @@ def get_ls_list(latent_types: List[str], latent_dims: List[int], kl_weights: Opt
         list_latent.append(
             LATENT_SPACE_MAP[latent_type](dim=latent_dim, kl_weight=kl_weight, **kwargs_list[num_latent]))
     return list_latent
+
+
+MODEL_MAP = {
+    "LSBDVAE": LSBDVAE
+}
+
+
+def get_autoencoder_model(model_type: str, encoder_backbones: List[Model],
+                          decoder_backbone: Model, latent_spaces: List[LatentSpace],
+                          **kwargs) -> Model:
+    """
+    Return the autoencoder model of the given type
+    :param model_type: Type of autoencoder model, see MODEL_MAP
+    :param encoder_backbones: List of encoder backbones
+    :param decoder_backbone: Decoder backbone model
+    :param latent_spaces: List of latent spaces
+    :param kwargs: Additional kwargs for the model
+    :return: Autoencoder model of the specified type
+    """
+    return MODEL_MAP[model_type](encoder_backbones=encoder_backbones, decoder_backbone=decoder_backbone,
+                                 latent_spaces=latent_spaces,
+                                 **kwargs)
