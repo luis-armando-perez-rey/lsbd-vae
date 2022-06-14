@@ -240,6 +240,17 @@ class BaseLSBDVAE(tf.keras.Model):
         assert len(encodings_list) == len(self.latent_spaces)
         return self.decoder_from_list.predict(encodings_list)
 
+    def generate_images(self, input_latents: List[np.array]) -> np.array:
+        """
+        Takes list of latent encodings arrays and decodes them into images
+        Args:
+            input_latents: list of arrays of shape (n_encodings, latent_dim), one for each latent space
+        Returns:
+            images array of shape (n_encodings, *image_shape)
+        """
+        assert len(input_latents) == len(self.latent_spaces)
+        return self.decoder_from_list.predict(input_latents)
+
     def reconstruct_images(self, input_images: np.array, return_latents: bool) -> (np.array, Optional[List[np.array]]):
         """
         Encode images and decode them again into reconstructions. Optionally include the encodings.
@@ -457,6 +468,20 @@ class LSBDVAE(tf.keras.Model):
 
     def get_config(self):
         pass
+
+    # noinspection PyBroadException
+    def compile(self, optimizer, **kwargs):
+        self.u_lsbd.compile(optimizer, **kwargs)
+        self.s_lsbd.compile(optimizer, **kwargs)
+
+    def encode_images(self, images):
+        return self.u_lsbd.encode_images(images)
+
+    def encode_images_scale(self, images):
+        return self.u_lsbd.encode_images_scale(images)
+
+    def generate_images(self, latent_inputs):
+        return self.u_lsbd.generate_images(latent_inputs)
 
     def __init__(self, encoder_backbones: List[tf.keras.models.Model], decoder_backbone: tf.keras.models.Model,
                  latent_spaces: List[LatentSpace], n_transforms: int, input_shape: Tuple[int, int, int],
