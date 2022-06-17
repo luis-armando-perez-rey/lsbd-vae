@@ -28,7 +28,7 @@ def test_hypertorus_perfect_embedding(n_subgroups: int, n_angles: int = 20):
     """
     # k = [1] * n_subgroups
     # Rotation group representation hyperparameter search can be within [-1, 1] for perfect embeddings
-    k_values = dlsbd_metric.create_combinations_k_values_range(-1, 1, n_subgroups)
+    k_values = dlsbd_metric.create_combinations_omega_values_range(-1, 1, n_subgroups)
     z = get_perfect_embeddings(n_subgroups, n_angles)
     output = dlsbd_metric.dlsbd(z, k_values, verbose=1, factor_manifold="torus")
     print(output)
@@ -45,7 +45,7 @@ def test_hypercylinder_perfect_embedding(n_subgroups: int, n_angles: int = 20, n
     """
     # k = [1] * n_subgroups
     # Rotation group representation hyperparameter search can be within [-1, 1] for perfect embeddings
-    k_values = dlsbd_metric.create_combinations_k_values_range(-1, 1, n_subgroups)
+    k_values = dlsbd_metric.create_combinations_omega_values_range(-1, 1, n_subgroups)
     z = get_perfect_embeddings(n_subgroups, n_angles)
     z = np.stack([z] * num_objects, axis=0)
     output = dlsbd_metric.dlsbd(z, k_values, verbose=1, factor_manifold="cylinder")
