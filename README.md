@@ -16,8 +16,12 @@ Or to reproduce the results obtained by training with data obtained through rand
 ```console
 bash ./experiments/run_semisup.py
 ```
+The Python file run.py can also be used to train the LSBD-VAE with a specific dataset. Available datasets with toroidal underlying structure are *arrow*, *pixel16*, *modelnet_colors*. And datasets with cylindrical structure are *coil100*, *modelnet40_airplanes".
 
-
+Type from the main repository folder:
+```console
+python ./experiments/run.py --dataset NAMEDATASET --epochs 1000
+```
 ## Folder Structure
 ```
 lsbd-vae
