@@ -2,7 +2,7 @@ import os
 
 # Load data
 PROJECT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-
+print(PROJECT_PATH)
 
 def return_data_parameters(data_name):
     if data_name == "arrow":
@@ -41,15 +41,15 @@ def return_data_parameters(data_name):
             "step_size_hor": 1,
             "square_size": 16
         }
-    elif data_name == "modelnet":
+    elif data_name == "modelnet_colors":
         data_parameters = {
             "root_path": PROJECT_PATH,
             "dataset_filename": "modelnet_color_single_64_64.h5",
             "data": "modelnet_colors"
         }
-    elif data_name == "modelnet40":
+    elif data_name == "modelnet40_airplanes":
         data_parameters = {
-            "root_path": "/data/aligned64",
+            "root_path": os.path.join(PROJECT_PATH, "data", "modelnet40"),
             "data": "modelnet40",
             "collection_list": [
                 "airplane"],
@@ -75,57 +75,6 @@ def return_data_parameters(data_name):
             "data_type": "test",
             "dataset_directory": ""
         }
-    elif data_name == "complete_modelnet40_train":
-        data_parameters = {
-            "root_path": os.path.join(PROJECT_PATH, "data/aligned64"),
-            "data": "modelnet40",
-            "collection_list": ["airplane",
-                                "bathtub", "bed", "bench", "bookshelf", "bottle", "bowl",
-                                "car", "chair", "cone", "cup", "curtain",
-                                "desk", "door", "dresser",
-                                "flower_pot",
-                                "glass_box",
-                                "guitar",
-                                "keyboard",
-                                "lamp", "laptop",
-                                "mantel", "monitor",
-                                "night_stand",
-                                "person", "piano", "plant",
-                                "radio", "range_hood",
-                                "sink", "sofa", "stairs", "stool",
-                                "table", "tent", "toilet", "tv_stand",
-                                "vase",
-                                "wardrobe",
-                                "xbox"],
-            "data_type": "train",
-            "dataset_directory": ""
-        }
-    elif data_name == "complete_modelnet40_test":
-        data_parameters = {
-            "root_path": os.path.join(PROJECT_PATH, "data/aligned64"),
-            "data": "modelnet40",
-            "collection_list": ["airplane",
-                                "bathtub", "bed", "bench", "bookshelf", "bottle", "bowl",
-                                "car", "chair", "cone", "cup", "curtain",
-                                "desk", "door", "dresser",
-                                "flower_pot",
-                                "glass_box",
-                                "guitar",
-                                "keyboard",
-                                "lamp", "laptop",
-                                "mantel", "monitor",
-                                "night_stand",
-                                "person", "piano", "plant",
-                                "radio", "range_hood",
-                                "sink", "sofa", "stairs", "stool",
-                                "table", "tent", "toilet", "tv_stand",
-                                "vase",
-                                "wardrobe",
-                                "xbox"],
-            "data_type": "test",
-            "dataset_directory": ""
-        }
-
     elif data_name == "coil100":
         data_parameters = {
             "root_path": PROJECT_PATH,
