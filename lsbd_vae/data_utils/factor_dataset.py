@@ -285,7 +285,7 @@ class FactorImageDataset:
                 where [:, 0, :] represents the identity transformations,
                 and [:, 1, :] represents the transformation from the first to the second element of a pair,
                 given as an angle on the unit circle
-            x_u: Unlabeled data points with shape (n_data_points - 2*n_labels, 1, height, width, depth)
+            x_u: Unlabeled data points with shape (n_data_points - 2 * n_labels, 1, height, width, depth)
 
         """
         x_l = []

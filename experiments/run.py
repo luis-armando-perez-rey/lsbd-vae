@@ -206,7 +206,7 @@ if args.dataset in TORUS_DATASETS:
     omega_values = create_combinations_omega_values_range(start_value=-10, end_value=10)
     lsbd_score, _ = dlsbd(latent_reps, omega_values, be_verbose=True, factor_manifold="torus")
 else:
-    omega_values = np.arange(-10, 11)
+    omega_values = create_combinations_omega_values_range(start_value=-10, end_value=10, n_transforms=1)
     lsbd_score, _ = dlsbd(latent_reps, omega_values, be_verbose=True, factor_manifold="cylinder")
 
 # Saving folder

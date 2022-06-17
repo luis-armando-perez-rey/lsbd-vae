@@ -167,14 +167,14 @@ def get_coil100(root_path, rescale_size=64):
     import tensorflow_datasets as tfds
     # load dataset from tfds
     data_path = os.path.join(root_path, "data", "tfds_coil100")
-    ds = tfds.load(
+    ds, ds_info = tfds.load(
         'coil100',
         split='train',
         batch_size=-1,
-        data_dir=data_path
+        data_dir=data_path,
+        with_info=True,
     )
-
-    if tfds.__version__ == "1.2.0":
+    if ds_info.version == "1.0.0":
         angles = tfds.as_numpy(ds["label"])
     else:
         angles = tfds.as_numpy(ds["angle_label"])
