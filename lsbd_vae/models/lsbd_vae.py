@@ -171,13 +171,13 @@ class BaseLSBDVAE(tf.keras.Model):
         ]
         return list_metrics
 
-    def calculate_loss_and_grads(self, reconstruction_loss, kl_loss, equivariance_loss, tape) -> None:
-        total_loss = reconstruction_loss + kl_loss + equivariance_loss
+    def calculate_loss_and_grads(self, *losses, tape) -> None:
+        total_loss = tf.add_n(losses)
         grads = tape.gradient(total_loss, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
-        self.kl_loss_tracker.update_state(kl_loss)
-        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        for num_metric, metric in enumerate(self.metrics):
+            metric.update_state(losses[num_metric])
 
     def set_decoder_from_list(self):
         """
@@ -472,7 +472,8 @@ class LSBDVAE(tf.keras.Model):
     # noinspection PyBroadException
     def compile(self, optimizer, **kwargs):
         self.u_lsbd.compile(optimizer, **kwargs)
-        self.s_lsbd.compile(optimizer, **kwargs)
+        if self.s_lsbd is not None:
+            self.s_lsbd.compile(optimizer, **kwargs)
 
     def encode_images(self, images):
         return self.u_lsbd.encode_images(images)
@@ -487,14 +488,18 @@ class LSBDVAE(tf.keras.Model):
                  latent_spaces: List[LatentSpace], n_transforms: int, input_shape: Tuple[int, int, int],
                  reconstruction_loss=gaussian_loss, stop_gradient: bool = False, anchor_locations: bool = False,
                  **kwargs):
+
         super(LSBDVAE, self).__init__(**kwargs)
 
         self.u_lsbd = UnsupervisedLSBDVAE(encoder_backbones, decoder_backbone,
                                           latent_spaces, input_shape,
                                           reconstruction_loss, stop_gradient, **kwargs)
-        self.s_lsbd = SupervisedLSBDVAE(encoder_backbones, decoder_backbone,
-                                        latent_spaces, n_transforms, input_shape,
-                                        reconstruction_loss, stop_gradient, anchor_locations, **kwargs)
+        if n_transforms == 0:
+            self.s_lsbd = None
+        else:
+            self.s_lsbd = SupervisedLSBDVAE(encoder_backbones, decoder_backbone,
+                                            latent_spaces, n_transforms, input_shape,
+                                            reconstruction_loss, stop_gradient, anchor_locations, **kwargs)
 
     def fit_semi_supervised(self, x_l, x_l_transformations, x_u, epochs, batch_size: int = 32,
                             callback_list: Optional[List[tf.keras.callbacks.Callback]] = None, verbose=1) -> None:
