@@ -32,8 +32,13 @@ def make_rotation_matrix_2d(angles):
     return matrix.reshape(output_shape)
 
 
-def flatten_array(array):
-    return array.reshape((np.product(array.shape[:-1]), array.shape[-1]))
+def flatten_array(array) -> np.array:
+    """
+    FLattens an array of shape (dim1, dim2, dim3, ... dimN) to have shape (dim1*dim2*dim3...*dimN-1, dimN)
+    :param array: Input array to be flattened
+    :return:
+    """
+    return array.reshape((-1, array.shape[-1]))
 
 
 def calculate_zg_flat(z: np.array, n_subgroup: int):
@@ -82,10 +87,14 @@ def calculate_projected_zg0(projected_zg, k, angles_flat):
     return p_zg0
 
 
-def dlsbd_k_torus(z, k, verbose=0):
+def dlsbd_k_torus(z, k):
     """
-    D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
+    D_LSBD metric measured over data with toroidal structure assumes the input z has shape (*num_angles, z_dim)
+    :param z: embeddings of the data with shape (*num_angles, z_dim)
+    :param k: parameters corresponding to the parametrization of the group representation
+    :return:
     """
+
     # Regular spacing of angles in [0,2pi)
     # assume z_dim has shape (*n_angles, z_dim)
     num_angles_tuple = z.shape[:-1]
@@ -111,7 +120,7 @@ def dlsbd_k_torus(z, k, verbose=0):
     return np.mean(equivariances_list), equivariances_list
 
 
-def dlsbd_k_cylinder(z, k, verbose=0):
+def dlsbd_k_cylinder(z, k):
     """
     D_LSBD metric assumes the input z has shape (*num_angles, z_dim)
     """
@@ -120,7 +129,7 @@ def dlsbd_k_cylinder(z, k, verbose=0):
     num_objects = z.shape[0]
     num_angles_tuple = z.shape[1:-1]
     n_subgroups = len(num_angles_tuple)
-    assert n_subgroups == len(k), "Parameter k should be the same size as the number of subgroups"
+    # assert n_subgroups == len(k), "Parameter k should be the same size as the number of subgroups"
     angles_regular = [get_regular_angles(num_angles) for num_angles in num_angles_tuple]
 
     # All possible combinations of the regular angles
@@ -143,26 +152,28 @@ def dlsbd_k_cylinder(z, k, verbose=0):
     return np.mean(equivariances_list), equivariances_list
 
 
-def dlsbd(z_loc, k_values, verbose=0, factor_manifold: str = "torus") -> Tuple[float, int]:
+def dlsbd(z_loc, k_values, be_verbose: bool = False, factor_manifold: str = "torus") -> Tuple[float, int]:
     available_manifolds = ["torus", "cylinder"]
     assert factor_manifold in available_manifolds, f"Factor manifold {factor_manifold} not available possible values " \
                                                    f"{available_manifolds}"
     metric_values = np.zeros(len(k_values))
     for num_k, k in enumerate(k_values):
         if factor_manifold == "torus":
-            metric_values[num_k] = np.sum(dlsbd_k_torus(z_loc, k=k, verbose=verbose)[0])
+            metric_values[num_k] = np.sum(dlsbd_k_torus(z_loc, k=k)[0])
         elif factor_manifold == "cylinder":
-            metric_values[num_k] = np.sum(dlsbd_k_cylinder(z_loc, k=k, verbose=verbose)[0])
-        if verbose == 1:
+            metric_values[num_k] = np.sum(dlsbd_k_cylinder(z_loc, k=k)[0])
+        if be_verbose:
             print("Combination number {} for k = {}, score = {}".format(num_k, k, metric_values[num_k]))
     score = np.amin(metric_values)
     k_min = k_values[np.argmin(metric_values)]
     return score, k_min
 
 
-def create_combinations_k_values_range(start_value: int = -10, end_value: int = 10, n_transforms: int = 2) -> np.array:
+def create_combinations_omega_values_range(start_value: int = -10, end_value: int = 10, n_transforms: int = 2) -> np.array:
     """
-    Creates an array of all possible combinations of the k parameter in the range [start_value, end_value] over n_transforms
+    Creates an array of all possible combinations of the k parameter in the range [start_value, end_value] over
+    n_transforms
+    :param n_transforms: number of subgroups in the group representation
     :param start_value: start value of the range
     :param end_value: end value of the range
     :return:
