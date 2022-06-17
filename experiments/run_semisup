@@ -1,0 +1,43 @@
+#!/bin/bash
+
+repetitions=(0)
+npair_values=(0 256 512 768 1024 1280 1536 1792 2048)
+
+
+# Run experiments for the TORUS datasets
+datasets=("pixel16" "arrow" "modelnet_colors")
+for dataset in "${datasets[@]}"
+do
+  for npairs in "${npair_values[@]}"
+  do
+    for repetition in "${repetitions[@]}"
+    do
+      echo "Running experiment for dataset $dataset with $npairs pairs and repetition $repetition"
+      python ./experiments/run.py --dataset ${dataset} --epochs 1500 --tag ${repetition} --architecture dislib --no-trainpath --npairs ${npairs} --distweight 100
+    done
+  done
+done
+
+
+#Run experiments for the CYLINDER datasets modelnet40_airplanes and coil100
+
+for repetition in "${repetitions[@]}"
+do
+  echo "Running experiment for modelnet40_airplanes with $npairs pairs and repetition $repetition"
+  # For modelnet40_airplanes, we need to run the experiment with the dense architecture as described in the paper otherwise we can get NaN values
+  python ./experiments/run.py --dataset modelnet40_airplanes --epochs 1500 --tag ${repetition} --architecture dense --no-trainpath --npairs 0 --distweight 100
+  python ./experiments/run.py --dataset modelnet40_airplanes --epochs 1500 --tag ${repetition} --architecture dislib --no-trainpath --npairs 32 --distweight 100
+done
+
+
+
+
+
+for repetition in "${repetitions[@]}"
+do
+  echo "Running experiment for coil100 with $npairs pairs and repetition $repetition"
+  python ./experiments/run.py --gpu $1 --dataset coil100 --epochs 6000 --tag ${repetition} --architecture dislib --no-trainpath --npairs 0
+  python ./experiments/run.py --gpu $1 --dataset coil100 --epochs 6000 --tag ${repetition} --architecture dislib --no-trainpath --npairs 36
+done
+
+

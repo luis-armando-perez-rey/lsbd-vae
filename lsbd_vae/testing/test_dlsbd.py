@@ -31,7 +31,6 @@ def test_hypertorus_perfect_embedding(n_subgroups: int, n_angles: int = 20):
     k_values = dlsbd_metric.create_combinations_omega_values_range(-1, 1, n_subgroups)
     z = get_perfect_embeddings(n_subgroups, n_angles)
     output = dlsbd_metric.dlsbd(z, k_values, verbose=1, factor_manifold="torus")
-    print(output)
     assert output[0] < np.finfo(float).eps, "Metric is not zero for perfect embedding"
     return 0
 
@@ -49,7 +48,6 @@ def test_hypercylinder_perfect_embedding(n_subgroups: int, n_angles: int = 20, n
     z = get_perfect_embeddings(n_subgroups, n_angles)
     z = np.stack([z] * num_objects, axis=0)
     output = dlsbd_metric.dlsbd(z, k_values, verbose=1, factor_manifold="cylinder")
-    print(output)
     assert output[0] < np.finfo(float).eps, "Metric is not zero for perfect embedding"
     return 0
 

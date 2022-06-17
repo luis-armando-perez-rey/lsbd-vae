@@ -1,0 +1,32 @@
+#!/bin/bash
+# We run the experiments creating 50 paths of length 100 and with size of random step equal to 3
+# In this experiment we add the flag --trainpath to train with the paths we don't use npairs in this case
+repetitions=(0)
+
+
+# Run experiments for the TORUS datasets
+datasets=("pixel16" "arrow" "modelnet_colors")
+for dataset in "${datasets[@]}"
+do
+  for npairs in "${npair_values[@]}"
+  do
+    for repetition in "${repetitions[@]}"
+    do
+      echo "Running experiment for dataset $dataset with $npairs pairs and repetition $repetition"
+      python ./experiments/run.py --dataset ${dataset} --epochs 1500 --tag ${repetition} --architecture dislib --trainpath --distweight 100
+    done
+  done
+done
+
+# Run experiments for the CYLINDER datasets modelnet40_airplanes and coil100
+for repetition in "${repetitions[@]}"
+do
+  echo "Running experiment for modelnet40_airplanes with $npairs pairs and repetition $repetition"
+  python ./experiments/run.py --dataset modelnet40_airplanes --epochs 1500 --tag ${repetition} --architecture dislib --trainpath
+done
+
+for repetition in "${repetitions[@]}"
+do
+  echo "Running experiment for coil100 with $npairs pairs and repetition $repetition"
+  python ./experiments/run.py --dataset coil100 --epochs 6000 --tag ${repetition} --architecture dislib --trainpath
+done

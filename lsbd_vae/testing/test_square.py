@@ -59,7 +59,6 @@ def test_train_slsbd_vae():
     x_l, x_l_transformations, x_u = dataset_class.setup_circles_dataset_labelled_pairs(n_labels)
     print("X_l shape", x_l.shape, "num transformations", len(x_l_transformations), "x_u len", len(x_u))
     transformations = x_l_transformations
-    print(x_l_transformations[0].shape)
     ulsbd = SupervisedLSBDVAE([encoder], decoder, latent_spaces, 2, input_shape=input_shape)
     ulsbd.compile(optimizer=tf.keras.optimizers.Adam(), loss=None)
     ulsbd.fit(x={"images": x_l, "transformations":transformations}, epochs=EPOCHS)
