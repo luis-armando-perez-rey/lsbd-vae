@@ -228,7 +228,50 @@ class FactorImageDataset:
         x_l_transformations = tuple(x_l_transformations)
         return x_l, x_l_transformations, x_u
 
-    def setup_cylinder_dataset_labelled_pairs(self, n_pairs: int, angle_factor: int = 1) -> (np.ndarray, List[np.ndarray], np.ndarray):
+    def setup_torus_dataset_labelled_groups(self, n_labels: int, data_per_group: int) -> (
+            np.ndarray, List[np.ndarray], np.ndarray):
+        """
+        Sets up a dataset with n_labels groups of data_per_group data points, each group containing a set of
+        data_per_group of data points.
+        Args:
+            n_labels: Number of labelled pairs to generate
+            data_per_group: Number of data points per group
+        Returns:
+            x_l: Labeled pairs array with shape (n_labels, 2, height, width, depth)
+            x_l_transformations: List of length n_factors, each element is an array of shape (n_labels, 2, 1)
+                where [:, 0, :] represents the identity transformations,
+                and [:, 1, :] represents the transformation from the first to the second element of a pair,
+                given as an angle on the unit circle
+            x_u: Unlabeled data points with shape (n_data_points - 2*n_labels, 1, height, width, depth)
+        """
+        # labelling procedure: randomly select n_labels pairs, such that each data point is part of at most one pair.
+        # produce the transformation label for each of those pairs.
+        assert data_per_group * n_labels <= self.n_data_points, \
+            "for this procedure data_per_group * n_labels cannot exceed the number of data points"
+        flat_factor_mesh = self.flat_factor_mesh
+        # sample the data indexes for the data_per_group*n_labels points to be labelled
+        indices = np.random.choice(self.n_data_points, size=data_per_group * n_labels, replace=False)
+        x_l_transformations = []
+        for factor_num in range(self.n_factors):
+            if self.factors_shape[factor_num] != 1:
+                factor_values = flat_factor_mesh[indices, factor_num].reshape((n_labels, data_per_group))
+                differences = (factor_values - np.expand_dims(factor_values[:, 0], axis=-1)) % \
+                              self.max_factor_values[factor_num]
+                angles = np.expand_dims(2 * np.pi * differences / self.max_factor_values[factor_num], axis=-1)
+                x_l_transformations.append(angles)
+
+        # set up the set x_l of labelled data points, with shape (n_labels, 2, height, width, depth)
+        x_l = self.flat_images[indices].reshape((n_labels, data_per_group, *self.image_shape))
+        # select all remaining data points for the unlabelled set x_u,
+        mask = np.ones(self.n_data_points, dtype=bool)
+        mask[indices] = False
+        x_u = self.flat_images[mask]
+        x_u = np.expand_dims(x_u, axis=1)  # shape (n_data_points - 2*n_labels, 1, height, width, depth)
+        x_l_transformations = tuple(x_l_transformations)
+        return x_l, x_l_transformations, x_u
+
+    def setup_cylinder_dataset_labelled_pairs(self, n_pairs: int, angle_factor: int = 1) -> (
+            np.ndarray, List[np.ndarray], np.ndarray):
         """
         For a dataset with objects in the first dimension, creates a set of x_l labeled pairs with x_l_transformations
         and a set of x_u unlabeled data
@@ -245,7 +288,6 @@ class FactorImageDataset:
             x_u: Unlabeled data points with shape (n_data_points - 2*n_labels, 1, height, width, depth)
 
         """
-        # TODO: actually the arrays in x_l_transformations have shape (n_labels, 2) without the extra axis. Is that ok?
         x_l = []
         x_u = []
         x_l_transformations = []
@@ -263,7 +305,49 @@ class FactorImageDataset:
             x_l_transformations.append(np.stack([identity_transformation, angles], axis=1))
             unlabeled_indexes = indexes[2 * n_pairs:]
             x_l.append(object[labeled_indexes].reshape((-1, 2, *self.image_shape)))
-            x_u.append(object[unlabeled_indexes].reshape((-1, 1,  *self.image_shape)))
+            x_u.append(object[unlabeled_indexes].reshape((-1, 1, *self.image_shape)))
+        x_u = np.concatenate(x_u, axis=0)
+        x_l = np.concatenate(x_l, axis=0)
+        x_l_transformations = np.concatenate(x_l_transformations, axis=0)
+        x_l_transformations = [np.zeros_like(x_l_transformations), x_l_transformations]
+        return x_l, tuple(x_l_transformations), x_u
+
+    def setup_cylinder_dataset_labelled_groups(self, n_sets: int, data_per_group: int, angle_factor: int = 1) -> (
+            np.ndarray, List[np.ndarray], np.ndarray):
+        """
+        For a dataset with objects in the first dimension. For each object within a dataset of n_objects create n_sets
+        of data_per_group labeled images x_l  with x_l_transformations and a set of x_u unlabeled data.
+        Args:
+            n_sets: number of sets to make from each object
+            angle_factor: index of the factor that contains the rotation information in the factor_mesh
+            data_per_group: number of data points per set created
+
+        Returns:
+            x_l: Labeled pairs array with shape (n_objects*n_sets, data_per_group, height, width, depth)
+            x_l_transformations: List of length n_factors, each element is an array of shape (n_objects*n_sets, data_per_group, 1)
+                where [:, 0, :] represents the identity transformations,
+                and [:, 1, :] represents the transformation from the first to the second element of a pair,
+                given as an angle on the unit circle
+            x_u: Unlabeled data points with shape (n_data_points - data_per_group*n_labels, 1, height, width, depth)
+
+        """
+
+        x_l = []
+        x_u = []
+        x_l_transformations = []
+
+        for num_object, object_images in enumerate(self.images):
+            indexes = np.arange(len(object_images))
+            np.random.shuffle(indexes)
+            labeled_indexes = indexes[:data_per_group * n_sets]
+            labels = self.factor_mesh[num_object, labeled_indexes, angle_factor]
+            labels = labels.reshape((-1, 2))
+            differences = (labels - np.expand_dims(labels[:, 0], axis=-1)) % self.max_factor_values[angle_factor]
+            angles = np.expand_dims(2 * np.pi * differences / self.max_factor_values[angle_factor], axis=-1)
+            x_l_transformations.append(angles)
+            unlabeled_indexes = indexes[data_per_group * n_sets:]
+            x_l.append(object_images[labeled_indexes].reshape((-1, data_per_group, *self.image_shape)))
+            x_u.append(object_images[unlabeled_indexes].reshape((-1, 1, *self.image_shape)))
         x_u = np.concatenate(x_u, axis=0)
         x_l = np.concatenate(x_l, axis=0)
         x_l_transformations = np.concatenate(x_l_transformations, axis=0)
@@ -327,7 +411,7 @@ class FactorImageDataset:
         # list of n_factor arrays of shape (n_paths, path_length, 1) representing the transformations between the path
         #   elements, given as angles from 0 to 2pi
         angles_relative = np.mod(2 * np.pi * random_paths_relative / self.factors_shape, 2 * np.pi)
-        transformations = tuple([angles_relative[:, :, i:i+1] for i in range(self.n_factors)])
+        transformations = tuple([angles_relative[:, :, i:i + 1] for i in range(self.n_factors)])
 
         # images corresponding to the paths, shape (n_paths, path_length, height, width, depth)
         images_paths = np.empty((n_paths, path_length, *self.image_shape))

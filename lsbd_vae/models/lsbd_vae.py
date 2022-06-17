@@ -34,7 +34,7 @@ class BaseLSBDVAE(tf.keras.Model):
         # Backbones
         self.encoder_backbones = encoder_backbones
         self.decoder = decoder_backbone
-        assert self.decoder.inputs[0].shape[-1] == self.latent_dim,\
+        assert self.decoder.inputs[0].shape[-1] == self.latent_dim, \
             "The decoder backbone should receive tensors of shape (batch_size, latent_dim)"
 
         # Set networks
@@ -251,7 +251,8 @@ class BaseLSBDVAE(tf.keras.Model):
         assert len(input_latents) == len(self.latent_spaces)
         return self.decoder_from_list.predict(input_latents)
 
-    def reconstruct_images(self, input_images: np.array, return_latents: bool) -> (np.array, Optional[List[np.array]]):
+    def reconstruct_images(self, input_images: np.array, return_latents: bool = False) -> (
+    np.array, Optional[List[np.array]]):
         """
         Encode images and decode them again into reconstructions. Optionally include the encodings.
         Args:

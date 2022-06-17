@@ -36,7 +36,7 @@ def get_transformed_pixel(root_path: str, height: int = 32, width: int = 32, squ
 
 def get_transformed_arrow(root_path, arrow_size=32, **kwargs_transform):
     assert arrow_size in [32, 64, 128], f"arrow size {arrow_size} not supported"
-    image_rgba = Image.open(os.path.join(root_path, "data", "single_images", f"arrow_{arrow_size}.png"))
+    image_rgba = Image.open(os.path.join(root_path, "data", "arrow_images", f"arrow_{arrow_size}.png"))
     image_rgb = image_rgba.convert("RGB")
     arrow_img = np.asarray(image_rgb)
     arrow_img = arrow_img.astype('float32') / 255.
