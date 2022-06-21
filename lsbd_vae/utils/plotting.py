@@ -4,9 +4,6 @@ from matplotlib import patches, pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axis import Axis
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-import imageio
-import os
-from PIL import Image
 from sklearn.decomposition import PCA
 
 
@@ -213,27 +210,6 @@ def plot_euclidean_embedding(encoded, colors) -> Figure:
     ax.add_artist(patches.Circle((0, 0), 1.0, fill=False, zorder=-1))
     ax.set_title("Euclidean embedding 2")
     return fig
-
-
-def make_gif(source_path, image_names_sorted, gif_path, gif_name, resolution=None, duration=0.25):
-    """
-    Make a gif from a set of images within source_path. Provide the image names in sorted order.
-    :param source_path: Soure path where the images are stored.
-    :param image_names_sorted: Image names sorted in the order they should be in the gif.
-    :param gif_path: Path where the gif should be stored
-    :param gif_name: Name of the gif file
-    :param resolution: Resolution of the output gif. If None, the resolution of the original images is used.
-    :param duration: Duration of the gif.
-    :return:
-    """
-    images = []
-    for filename in image_names_sorted:
-        if resolution is None:
-            images.append(Image.open(os.path.join(source_path, filename)))
-        else:
-            images.append(Image.open(os.path.join(source_path, filename)).resize(resolution))
-    imageio.mimsave(os.path.join(gif_path, gif_name + '.gif'), images, duration=duration)
-
 
 def plot_latent_dimension_combinations(z, colors_flat) -> Tuple[Figure, List[Axis]]:
     """
