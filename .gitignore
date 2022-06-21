@@ -119,3 +119,4 @@ data/
 jupyter_notebooks/
 testing/
 hpc_run_*
+experiments/results/
