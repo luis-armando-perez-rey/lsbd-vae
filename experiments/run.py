@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(
     description="Training of LSBDVAE model either using paths or with semi-supervised pairs")
 parser.add_argument("--gpu", nargs="?", dest="gpu_num", type=str, default="0", help="gpu to be used")
 parser.add_argument("--dataset", nargs="?", dest="dataset", type=str, default="", help="Dataset to be used")
-parser.add_argument("--architecture", nargs="?", dest="architecture", type=str, default="dis_lib",
+parser.add_argument("--architecture", nargs="?", dest="architecture", type=str, default="dislib",
                     help="Architecture of model")
 parser.add_argument("--tag", nargs="?", dest="tag", type=str, default="test",
                     help="Experiment tag used to save")
