@@ -117,4 +117,3 @@ dmypy.json
 .idea/
 data/
 jupyter_notebooks/
-run_*
