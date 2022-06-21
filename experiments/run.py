@@ -37,7 +37,7 @@ parser.add_argument("--spaths", nargs="?", dest="spaths", type=int, default=3,
                     help="Step size of paths")
 parser.add_argument("--epochs", nargs="?", dest="epochs", type=int, default=100,
                     help="Training epochs")
-parser.add_argument("--batch_size", nargs="?", dest="batch_size", type=int, default=100000,
+parser.add_argument("--batch_size", nargs="?", dest="batch_size", type=int, default=100,
                     help="Batch size")
 parser.add_argument("--model_type", nargs="?", dest="model_type", type=str, default="LSBDVAE",
                     help="Autoencoder model type")
