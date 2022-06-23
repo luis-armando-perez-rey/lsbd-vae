@@ -31,7 +31,7 @@ def plot_subset(x_array, cols=None, outlines=True) -> Figure:
     for j, x_row in enumerate(x_array):
         for i, x in enumerate(x_row[:x_cols], 1):
             # display original
-            ax = plt.subplot(rows, cols, i + j * cols * (rows / len(x_array)))  # rows, cols, subplot numbered from 1
+            ax = plt.subplot(rows, cols, i + j * cols * (rows // len(x_array)))  # rows, cols, subplot numbered from 1
             draw_subplot(x, ax)
 
     return fig
