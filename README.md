@@ -2,10 +2,17 @@
 This is the code for the paper "Quantifying and Learning Symmetry-Based Disentanglement"[1] presented in [ICML2022](https://icml.cc/virtual/2022/spotlight/17702).  Please find a tutorial for running a basic experiment within this repository in this [notebook](notebooks/basic_experiment.ipynb).
 
 ## Requirements
-This code has been tested with Tensorflow version 2.3.1, this code also requires [Tensorflow Datasets](https://www.tensorflow.org/datasets) and it has been tested with version 3.2.1. 
+This code has been tested with the following packages:
+- tensorflow== 2.4.1
+- tensorflow-datasets==1.2.0
+- tensorflow-probability=0.12.2
 
 ## Data
 The data used in this paper can be downloaded from the following [link](https://drive.google.com/file/d/19JTHk5I5yDnaSq_lX7DKTIvgg6J5Sz3-/view?usp=sharing). Please unzip the files within the main folder of the repository to obtain the same folder structure as detailed. 
+
+The ModelNet40 dataset we have used to produce the renders can be found [here](http://modelnet.cs.princeton.edu/). If you use the dataset we provided please also cite their work [2].
+
+*Note:* The COIL-100 dataset is downloaded using tensorflow-datasets and should download the data into the data folder. 
 
 ## Reproduce Results
 In order to reproduce the results obtained by training the LSBD-VAE using semi-supervised training type from the main repository the following:
@@ -41,10 +48,6 @@ lsbd-vae
 │   |   │   latentspace.py
 │   |   │   lsbd_vae.py
 │   |   └───reconstruction_losses.py
-│   └───testing
-|   |   |   test_dlsbd.py
-|   |   |   test_lsbd_vae.sh
-|   |   └───test_square.sh
 │   └───utils
 │       │   architectures.py
 │       │   latentspace.py
@@ -81,3 +84,9 @@ For any questions regarding the code refer to [Loek Tonnaer](l.m.a.tonnaer@tue.n
   year={2020}
 }
 ```
+
+[2] Wu, Z., Song, S., Khosla, A., Yu, F., Zhang, L., Tang, X., & Xiao, J. (2015). *3d shapenets: A deep representation for volumetric shapes* In Proceedings of the IEEE conference on computer vision and pattern recognition.
+
+
+
+
