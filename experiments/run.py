@@ -93,7 +93,8 @@ if args.dataset in TORUS_DATASETS:
         x_u = np.array([])
         n_transforms = args.lpaths
     else:
-        n_transforms = args.npairs
+        # Train with paired labelled data
+        n_transforms = 2
         x_l, x_l_transformations, x_u = data_class.setup_circles_dataset_labelled_pairs(args.npairs)
 else:
     if args.trainpath:
@@ -102,7 +103,8 @@ else:
         n_transforms = args.lpaths
     else:
         x_l, x_l_transformations, x_u = data_class.setup_cylinder_dataset_labelled_pairs(args.npairs)
-        n_transforms = args.npairs
+        # Train with paired labelled data
+        n_transforms = 2
 
 print("Unlabeled shape", x_u.shape)
 print("Labeled shape", x_l.shape, "Transformation shape 1", x_l_transformations[0].shape)

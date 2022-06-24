@@ -12,7 +12,7 @@ do
   do
     for repetition in "${repetitions[@]}"
     do
-      echo "Running experiment for dataset $dataset with $npairs pairs and repetition $repetition"
+      echo "Running experiment for dataset $dataset repetition $repetition"
       python ./experiments/run.py --dataset ${dataset} --epochs 1500 --tag ${repetition} --architecture dislib --trainpath --distweight 100
     done
   done
@@ -21,12 +21,12 @@ done
 # Run experiments for the CYLINDER datasets modelnet40_airplanes and coil100
 for repetition in "${repetitions[@]}"
 do
-  echo "Running experiment for modelnet40_airplanes with $npairs pairs and repetition $repetition"
+  echo "Running experiment for modelnet40_airplanes repetition $repetition"
   python ./experiments/run.py --dataset modelnet40_airplanes --epochs 1500 --tag ${repetition} --architecture dislib --trainpath
 done
 
 for repetition in "${repetitions[@]}"
 do
-  echo "Running experiment for coil100 with $npairs pairs and repetition $repetition"
+  echo "Running experiment for coil100 repetition $repetition"
   python ./experiments/run.py --dataset coil100 --epochs 6000 --tag ${repetition} --architecture dislib --trainpath
 done
