@@ -1,5 +1,8 @@
 # LSBD-VAE
-This is the code for the paper "Quantifying and Learning Symmetry-Based Disentanglement"[1] presented in [ICML2022](https://icml.cc/virtual/2022/spotlight/17702).  Please find a tutorial for running a basic experiment within this repository in this [notebook](notebooks/basic_experiment.ipynb).
+This is the code for the paper "Quantifying and Learning Symmetry-Based Disentanglement"[1] presented in [ICML2022](https://icml.cc/virtual/2022/spotlight/17702).  Please find a tutorial for running a basic experiment within this repository in this [notebook](notebooks/basic_experiment.ipynb). 
+
+
+![gif_summary](https://github.com/luis-armando-perez-rey/lsbd-vae/blob/main/images/ICML%20Video_medium.gif)
 
 ## Requirements
 This code has been tested with the following packages:
@@ -12,6 +15,7 @@ The data used in this paper can be downloaded from the following [link](https://
 
 The ModelNet40 dataset we have used to produce the renders can be found [here](http://modelnet.cs.princeton.edu/). If you use the dataset we provided please also cite their work [2].
 
+![example_data](https://github.com/luis-armando-perez-rey/lsbd-vae/blob/main/images/data_examples.PNG)
 *Note:* The COIL-100 dataset is downloaded using tensorflow-datasets and should download the data into the data folder. 
 
 ## Reproduce Results
