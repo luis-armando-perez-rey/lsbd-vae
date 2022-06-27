@@ -15,6 +15,7 @@ The data used in this paper can be downloaded from the following [link](https://
 
 The ModelNet40 dataset we have used to produce the renders can be found [here](http://modelnet.cs.princeton.edu/). If you use the dataset we provided please also cite their work [2].
 
+![example_data](https://github.com/luis-armando-perez-rey/lsbd-vae/blob/main/images/data_examples.PNG)
 *Note:* The COIL-100 dataset is downloaded using tensorflow-datasets and should download the data into the data folder. 
 
 ## Reproduce Results
