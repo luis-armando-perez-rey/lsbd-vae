@@ -8,14 +8,12 @@ repetitions=(0)
 datasets=("pixel16" "arrow" "modelnet_colors")
 for dataset in "${datasets[@]}"
 do
-  for npairs in "${npair_values[@]}"
-  do
     for repetition in "${repetitions[@]}"
     do
       echo "Running experiment for dataset $dataset repetition $repetition"
       python ./experiments/run.py --dataset ${dataset} --epochs 1500 --tag ${repetition} --architecture dislib --trainpath --distweight 100
+
     done
-  done
 done
 
 # Run experiments for the CYLINDER datasets modelnet40_airplanes and coil100
