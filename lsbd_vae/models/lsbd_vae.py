@@ -164,10 +164,16 @@ class BaseLSBDVAE(tf.keras.Model):
 
     @property
     def metrics(self) -> List[tf.keras.metrics.Metric]:
+        """
+        We need to add all the metrics so at the end of each epoch loss states are reset. Total loss always should
+        be the last metric
+        :return:
+        """
         list_metrics = [
             self.reconstruction_loss_tracker,
             self.kl_loss_tracker,
             self.equivariance_tracker,
+            self.total_loss_tracker,
         ]
         return list_metrics
 
@@ -176,7 +182,8 @@ class BaseLSBDVAE(tf.keras.Model):
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.total_loss_tracker.update_state(total_loss)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        for num_metric, metric in enumerate(self.metrics):
+        # Don't update the last metric which is the total_loss
+        for num_metric, metric in enumerate(self.metrics[:-1]):
             metric.update_state(losses[num_metric])
 
     def set_decoder_from_list(self):

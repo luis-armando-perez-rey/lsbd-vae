@@ -49,6 +49,12 @@ class LatentSpace:
     def latent_dim(self):
         raise NotImplementedError()
 
+    @staticmethod
+    def projection(z_euclidean):
+        """Projects z_euclidean onto the latent manifold. If the manifold is Euclidean,
+         the projection is the identity"""
+        raise z_euclidean
+
     def get_params(self, h_enc):
         return [param_layer(h_enc) for param_layer in self.params_layers]
 
