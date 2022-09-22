@@ -124,7 +124,7 @@ class BaseLSBDVAE(tf.keras.Model):
         Set the encoder model that can receive images with shape (n_images, *image_shape)
         """
         # Pass each image through the encoder, input_layer should have shape (num_transformations, *input_shape)
-        input_layer = tf.keras.layers.Input(self.input_shape_)
+        input_layer = tf.keras.layers.Input(self.input_shape_, name="images")
         lst_sample = []  # List of samples per latent space
         lst_loc = []  # List of loc parameter per latent space
         lst_scale = []  # List of scale parameter per latent space
